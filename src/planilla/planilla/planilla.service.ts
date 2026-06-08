@@ -18,9 +18,13 @@ export class PlanillaService {
     });
     if (!cuenta) throw new NotFoundException('Cuenta de cobro no encontrada');
     if (rol === 'SUPERVISOR') {
-      if (cuenta.codigoTerceroSupervisor !== codigoTercero) throw new ForbiddenException();
+      if (!cuenta.codigoTerceroSupervisor || cuenta.codigoTerceroSupervisor !== codigoTercero) {
+        throw new ForbiddenException('No tienes permisos para acceder a esta planilla');
+      }
     } else {
-      if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException();
+      if (cuenta.codigoTercero !== codigoTercero) {
+        throw new ForbiddenException('No tienes permisos para acceder a esta planilla');
+      }
     }
     const planilla = await this.prisma.planilla.findUnique({ where: { cuentaCobroId } });
     if (!planilla) throw new NotFoundException('Aún no hay planilla registrada para esta cuenta');
@@ -63,7 +67,7 @@ export class PlanillaService {
       select: { codigoTercero: true, codigoTerceroSupervisor: true, estado: true, valorCobrado: true },
     });
     if (!cuenta) throw new NotFoundException('Cuenta de cobro no encontrada');
-    if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException();
+    if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException('No tienes permisos para modificar esta planilla');
     return cuenta;
   }
 }
