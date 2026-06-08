@@ -49,7 +49,7 @@ export class CuentasCobroController {
   @Get(':id')
   @Roles(Rol.CONTRATISTA, Rol.SUPERVISOR, Rol.APROBADOR)
   @ApiOperation({ summary: 'Obtener detalle de una cuenta de cobro' })
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(BigInt(id));
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.findOne(BigInt(id), user.codigoTercero, user.rol);
   }
 }

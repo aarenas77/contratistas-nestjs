@@ -91,8 +91,8 @@ export class CuentasCobroService {
     };
   }
 
-  async findOne(id: bigint) {
-    return this.prisma.cuentaCobro.findUniqueOrThrow({
+  async findOne(id: bigint, codigoTercero: string, rol: string) {
+    const cuenta = await this.prisma.cuentaCobro.findUniqueOrThrow({
       where: { id },
       include: {
         planilla: true,
@@ -103,6 +103,22 @@ export class CuentasCobroService {
         historialEstados: { orderBy: { createdAt: 'asc' } },
       },
     });
+
+    // APROBADOR puede ver todas las cuentas
+    if (rol !== 'APROBADOR') {
+      if (rol === 'SUPERVISOR') {
+        if (!cuenta.codigoTerceroSupervisor || cuenta.codigoTerceroSupervisor !== codigoTercero) {
+          throw new ForbiddenException('No tienes permisos para ver esta cuenta de cobro');
+        }
+      } else {
+        // CONTRATISTA
+        if (cuenta.codigoTercero !== codigoTercero) {
+          throw new ForbiddenException('No tienes permisos para ver esta cuenta de cobro');
+        }
+      }
+    }
+
+    return cuenta;
   }
 
   async resumenRadicacion(id: bigint, codigoTercero: string) {
