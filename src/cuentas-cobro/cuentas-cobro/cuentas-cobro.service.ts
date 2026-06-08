@@ -6,7 +6,7 @@ import { EstadoCuentaCobro } from '@prisma/client';
 
 const ESTADO_LEGACY: Record<EstadoCuentaCobro, { idEstado: number; estado: string }> = {
   BORRADOR:               { idEstado: 0, estado: 'BORRADOR' },
-  RADICADA:               { idEstado: 1, estado: 'ACTIVO' },
+  RADICADA:               { idEstado: 1, estado: 'RADICADA' },
   EN_REVISION_SUPERVISOR: { idEstado: 2, estado: 'PENDIENTE' },
   DEVUELTA_CONTRATISTA:   { idEstado: 3, estado: 'DEVUELTA' },
   APROBADA_SUPERVISOR:    { idEstado: 4, estado: 'APROBADA_SUPERVISOR' },
@@ -51,15 +51,19 @@ export class CuentasCobroService {
 
     const totalPaginas = Math.ceil(totalElementos / size);
     const data = cuentas.map((c) => {
-      const { idEstado, estado } = ESTADO_LEGACY[c.estado];
+      const { idEstado } = ESTADO_LEGACY[c.estado];
 
-      // Calcular si la cuenta está disponible para radicar
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
       const disponibleParaRadicar =
         c.estado === 'BORRADOR' &&
         new Date(c.fechaInicio) <= hoy &&
         new Date(c.fechaFin) >= hoy;
+
+      let estado = ESTADO_LEGACY[c.estado].estado;
+      if (c.estado === 'BORRADOR') {
+        estado = disponibleParaRadicar ? 'PENDIENTE' : 'INACTIVA';
+      }
 
       return {
         idPago: Number(c.id),
@@ -70,6 +74,8 @@ export class CuentasCobroService {
         codigoTerceroSupervisor: c.codigoTerceroSupervisor ? Number(c.codigoTerceroSupervisor) : null,
         idEstado,
         estado,
+        fechaInicio: c.fechaInicio,
+        fechaFin: c.fechaFin,
         fechaSolicitud: c.fechaSolicitud?.toISOString() ?? null,
         valorSolicitud: Number(c.valorCobrado),
         disponibleParaRadicar,

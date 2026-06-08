@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDateString, IsEnum, IsNumber, IsOptional, IsPositive, IsString, MaxLength } from 'class-validator';
+import { Allow, IsDateString, IsEnum, IsNumber, IsOptional, IsPositive, IsString, MaxLength } from 'class-validator';
 
 export enum CodigoConcepto {
   ALIMENTACION = 'ALIMENTACION',
@@ -31,5 +31,6 @@ export class CrearGastoDto {
   observacion?: string;
 
   @ApiProperty({ type: 'string', format: 'binary', description: 'Evidencia del gasto (max 10 MB)' })
+  @Allow()
   archivo: any;
 }
