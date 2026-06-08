@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, HttpCode } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CuentasCobroService } from './cuentas-cobro.service';
 import { CreateCuentaCobroDto } from '../dto/create-cuenta-cobro.dto';
@@ -29,6 +29,21 @@ export class CuentasCobroController {
   })
   listar(@CurrentUser() user: JwtPayload, @Query() dto: ListarCuentasCobroDto) {
     return this.service.listar(user.codigoTercero, dto);
+  }
+
+  @Get(':id/resumen-radicacion')
+  @Roles(Rol.CONTRATISTA)
+  @ApiOperation({ summary: 'Ver resumen de la cuenta antes de radicar' })
+  resumenRadicacion(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.resumenRadicacion(BigInt(id), user.codigoTercero);
+  }
+
+  @Post(':id/radicar')
+  @Roles(Rol.CONTRATISTA)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Radicar (enviar al supervisor) la cuenta de cobro' })
+  radicar(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.radicar(BigInt(id), user.codigoTercero, user.nombre);
   }
 
   @Get(':id')

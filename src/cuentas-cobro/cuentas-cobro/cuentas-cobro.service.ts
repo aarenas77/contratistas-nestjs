@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma/prisma.service';
 import { CreateCuentaCobroDto } from '../dto/create-cuenta-cobro.dto';
 import { ListarCuentasCobroDto } from '../dto/listar-cuentas-cobro.dto';
@@ -52,6 +52,15 @@ export class CuentasCobroService {
     const totalPaginas = Math.ceil(totalElementos / size);
     const data = cuentas.map((c) => {
       const { idEstado, estado } = ESTADO_LEGACY[c.estado];
+
+      // Calcular si la cuenta está disponible para radicar
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      const disponibleParaRadicar =
+        c.estado === 'BORRADOR' &&
+        new Date(c.fechaInicio) <= hoy &&
+        new Date(c.fechaFin) >= hoy;
+
       return {
         idPago: Number(c.id),
         ticket: c.ticket,
@@ -63,6 +72,7 @@ export class CuentasCobroService {
         estado,
         fechaSolicitud: c.fechaSolicitud?.toISOString() ?? null,
         valorSolicitud: Number(c.valorCobrado),
+        disponibleParaRadicar,
       };
     });
 
@@ -92,6 +102,115 @@ export class CuentasCobroService {
         ejecucionFisica: true,
         historialEstados: { orderBy: { createdAt: 'asc' } },
       },
+    });
+  }
+
+  async resumenRadicacion(id: bigint, codigoTercero: string) {
+    const cuenta = await this.prisma.cuentaCobro.findUniqueOrThrow({
+      where: { id },
+      include: {
+        actividades: {
+          select: {
+            id: true,
+            descripcion: true,
+            fechaActividad: true,
+            adjuntos: { select: { id: true, nombre: true } },
+          },
+        },
+        planilla: {
+          select: {
+            plantillaPagoNo: true,
+            fechaPago: true,
+            periodoPagado: true,
+            ingresoBaseCotizacion: true,
+            aporteSalud: true,
+            aportePension: true,
+            aporteArl: true,
+            valorPagado: true,
+          },
+        },
+        checklistItems: {
+          orderBy: { idChecklist: 'asc' },
+          select: { idChecklist: true, nombre: true, kaNlCumple: true },
+        },
+        gastos: {
+          select: { id: true, codigoConcepto: true, valor: true, fecha: true, observacion: true },
+        },
+      },
+    });
+
+    if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException();
+
+    const totalGastos = cuenta.gastos.reduce((acc, g) => acc + Number(g.valor), 0);
+
+    return {
+      cuentaCobroId: Number(id),
+      estado: cuenta.estado,
+      fechaInicio: cuenta.fechaInicio,
+      fechaFin: cuenta.fechaFin,
+      valorCobrado: Number(cuenta.valorCobrado),
+      actividades: {
+        total: cuenta.actividades.length,
+        items: cuenta.actividades,
+      },
+      planilla: cuenta.planilla,
+      checklist: {
+        total: cuenta.checklistItems.length,
+        respondidos: cuenta.checklistItems.filter((c) => c.kaNlCumple !== null).length,
+        items: cuenta.checklistItems,
+      },
+      gastos: {
+        total: cuenta.gastos.length,
+        valorTotal: totalGastos,
+        items: cuenta.gastos,
+      },
+    };
+  }
+
+  async radicar(id: bigint, codigoTercero: string, usuarioNombre: string) {
+    const cuenta = await this.prisma.cuentaCobro.findUniqueOrThrow({
+      where: { id },
+      include: {
+        actividades: { select: { id: true } },
+        planilla: { select: { id: true } },
+        checklistItems: { select: { kaNlCumple: true } },
+      },
+    });
+
+    if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException();
+    if (cuenta.estado !== 'BORRADOR') {
+      throw new BadRequestException('La cuenta ya fue radicada o no está en estado BORRADOR');
+    }
+    if (cuenta.actividades.length === 0) {
+      throw new BadRequestException('Debe registrar al menos una actividad antes de radicar');
+    }
+    if (!cuenta.planilla) {
+      throw new BadRequestException('Debe registrar la planilla de seguridad social antes de radicar');
+    }
+    if (cuenta.checklistItems.length < 6) {
+      throw new BadRequestException('Debe consultar y completar el checklist de retefuente antes de radicar');
+    }
+    const sinResponder = cuenta.checklistItems.filter((c) => c.kaNlCumple === null).length;
+    if (sinResponder > 0) {
+      throw new BadRequestException(`Quedan ${sinResponder} ítem(s) del checklist sin responder`);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const actualizada = await tx.cuentaCobro.update({
+        where: { id },
+        data: { estado: 'RADICADA', fechaSolicitud: new Date() },
+      });
+      await tx.historialEstado.create({
+        data: {
+          cuentaCobroId: id,
+          estadoAnterior: 'BORRADOR',
+          estadoNuevo: 'RADICADA',
+          usuarioId: codigoTercero,
+          usuarioNombre,
+          observacion: 'Cuenta de cobro radicada por el contratista',
+        },
+      });
+      return { ...actualizada, mensaje: 'Cuenta de cobro radicada exitosamente' };
     });
   }
 }
