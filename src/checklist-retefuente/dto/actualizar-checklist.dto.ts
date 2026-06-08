@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsIn, IsInt, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class RespuestaItemDto {
   @ApiProperty({ example: 1, minimum: 1, maximum: 6 })
@@ -17,6 +17,7 @@ export class RespuestaItemDto {
   @ApiProperty({ example: 'Observación opcional', required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   observacion?: string;
 }
 

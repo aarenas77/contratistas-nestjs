@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Rol } from '../../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../../prisma/prisma/prisma.service';
 import { ActualizarChecklistDto } from '../dto/actualizar-checklist.dto';
 
@@ -21,7 +22,7 @@ export class ChecklistRetefuenteService {
       select: { codigoTercero: true, codigoTerceroSupervisor: true },
     });
     if (!cuenta) throw new NotFoundException('Cuenta de cobro no encontrada');
-    if (rol === 'SUPERVISOR') {
+    if (rol === Rol.SUPERVISOR) {
       if (!cuenta.codigoTerceroSupervisor || cuenta.codigoTerceroSupervisor !== codigoTercero) {
         throw new ForbiddenException('No tienes permisos para acceder a esta cuenta');
       }
@@ -31,17 +32,19 @@ export class ChecklistRetefuenteService {
       }
     }
 
-    const existentes = await this.prisma.checklistRetefuente.count({ where: { cuentaCobroId } });
-    if (existentes === 0) {
-      await this.prisma.checklistRetefuente.createMany({
-        data: ITEMS_CHECKLIST.map((item) => ({
-          cuentaCobroId,
-          idChecklist: item.idChecklist,
-          nombre: item.nombre,
-          kaNlCumple: null,
-        })),
-      });
-    }
+    await this.prisma.$transaction(async (tx) => {
+      const existentes = await tx.checklistRetefuente.count({ where: { cuentaCobroId } });
+      if (existentes === 0) {
+        await tx.checklistRetefuente.createMany({
+          data: ITEMS_CHECKLIST.map((item) => ({
+            cuentaCobroId,
+            idChecklist: item.idChecklist,
+            nombre: item.nombre,
+            kaNlCumple: null,
+          })),
+        });
+      }
+    });
 
     return this.prisma.checklistRetefuente.findMany({
       where: { cuentaCobroId },
