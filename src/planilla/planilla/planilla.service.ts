@@ -1,4 +1,58 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma/prisma.service';
+import { UpsertPlanillaDto } from '../dto/upsert-planilla.dto';
 
 @Injectable()
-export class PlanillaService {}
+export class PlanillaService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async obtener(cuentaCobroId: bigint, codigoTercero: string) {
+    await this.verificarPropietario(cuentaCobroId, codigoTercero);
+    const planilla = await this.prisma.planilla.findUnique({ where: { cuentaCobroId } });
+    if (!planilla) throw new NotFoundException('Aún no hay planilla registrada para esta cuenta');
+    return planilla;
+  }
+
+  async upsert(cuentaCobroId: bigint, dto: UpsertPlanillaDto, codigoTercero: string) {
+    const cuenta = await this.verificarPropietario(cuentaCobroId, codigoTercero);
+    if (cuenta.estado !== 'BORRADOR') {
+      throw new BadRequestException('Solo se puede modificar la planilla cuando la cuenta está en BORRADOR');
+    }
+    const totalAportes = dto.aporteSalud + dto.aportePension + dto.aporteArl;
+    if (totalAportes > Number(cuenta.valorCobrado)) {
+      throw new BadRequestException(
+        `La suma de aportes (${totalAportes}) no puede superar el valor cobrado (${cuenta.valorCobrado})`,
+      );
+    }
+    const data = {
+      plantillaPagoNo: dto.plantillaPagoNo,
+      fechaPago: new Date(dto.fechaPago),
+      periodoPagado: dto.periodoPagado,
+      ingresoBaseCotizacion: dto.ingresoBaseCotizacion,
+      aporteSalud: dto.aporteSalud,
+      aportePension: dto.aportePension,
+      aporteArl: dto.aporteArl,
+      valorPagado: dto.valorPagado,
+    };
+    return this.prisma.planilla.upsert({
+      where: { cuentaCobroId },
+      create: { cuentaCobroId, ...data },
+      update: data,
+    });
+  }
+
+  private async verificarPropietario(cuentaCobroId: bigint, codigoTercero: string) {
+    const cuenta = await this.prisma.cuentaCobro.findUnique({
+      where: { id: cuentaCobroId },
+      select: { codigoTercero: true, estado: true, valorCobrado: true },
+    });
+    if (!cuenta) throw new NotFoundException('Cuenta de cobro no encontrada');
+    if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException();
+    return cuenta;
+  }
+}
