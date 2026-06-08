@@ -177,6 +177,16 @@ export class CuentasCobroService {
       },
     });
 
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const fechaInicio = new Date(cuenta.fechaInicio);
+    fechaInicio.setHours(0, 0, 0, 0);
+    const fechaFin = new Date(cuenta.fechaFin);
+    fechaFin.setHours(0, 0, 0, 0);
+    if (hoy < fechaInicio || hoy > fechaFin) {
+      throw new BadRequestException('La cuenta solo puede radicarse dentro del período vigente (fechaInicio - fechaFin)');
+    }
+
     if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException();
     if (cuenta.estado !== 'BORRADOR') {
       throw new BadRequestException('La cuenta ya fue radicada o no está en estado BORRADOR');
