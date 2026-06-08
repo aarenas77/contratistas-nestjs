@@ -40,7 +40,7 @@ export class ActividadesController {
     const adjunto = await this.service.getAdjunto(BigInt(adjuntoId), user.codigoTercero);
     res.set({
       'Content-Type': adjunto.mimeType ?? 'application/octet-stream',
-      'Content-Disposition': `inline; filename="${adjunto.nombre}"`,
+      'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(adjunto.nombre)}`,
       'Content-Length': String(adjunto.tamanioBytes ?? 0),
     });
     res.send(adjunto.datos);
