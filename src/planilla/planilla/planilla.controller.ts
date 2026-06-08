@@ -17,7 +17,7 @@ export class PlanillaController {
   @Roles(Rol.CONTRATISTA, Rol.SUPERVISOR)
   @ApiOperation({ summary: 'Obtener planilla de seguridad social de una cuenta de cobro' })
   obtener(@Param('cuentaCobroId') id: string, @CurrentUser() user: JwtPayload) {
-    return this.service.obtener(BigInt(id), user.codigoTercero);
+    return this.service.obtener(BigInt(id), user.codigoTercero, user.rol);
   }
 
   @Put(':cuentaCobroId')

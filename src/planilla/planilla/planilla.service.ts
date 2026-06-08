@@ -11,8 +11,17 @@ import { UpsertPlanillaDto } from '../dto/upsert-planilla.dto';
 export class PlanillaService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async obtener(cuentaCobroId: bigint, codigoTercero: string) {
-    await this.verificarPropietario(cuentaCobroId, codigoTercero);
+  async obtener(cuentaCobroId: bigint, codigoTercero: string, rol: string) {
+    const cuenta = await this.prisma.cuentaCobro.findUnique({
+      where: { id: cuentaCobroId },
+      select: { codigoTercero: true, codigoTerceroSupervisor: true },
+    });
+    if (!cuenta) throw new NotFoundException('Cuenta de cobro no encontrada');
+    if (rol === 'SUPERVISOR') {
+      if (cuenta.codigoTerceroSupervisor !== codigoTercero) throw new ForbiddenException();
+    } else {
+      if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException();
+    }
     const planilla = await this.prisma.planilla.findUnique({ where: { cuentaCobroId } });
     if (!planilla) throw new NotFoundException('Aún no hay planilla registrada para esta cuenta');
     return planilla;
@@ -24,7 +33,9 @@ export class PlanillaService {
       throw new BadRequestException('Solo se puede modificar la planilla cuando la cuenta está en BORRADOR');
     }
     const totalAportes = dto.aporteSalud + dto.aportePension + dto.aporteArl;
-    if (totalAportes > Number(cuenta.valorCobrado)) {
+    const totalAportesRedondeado = Math.round(totalAportes * 100);
+    const valorCobradoRedondeado = Math.round(Number(cuenta.valorCobrado) * 100);
+    if (totalAportesRedondeado > valorCobradoRedondeado) {
       throw new BadRequestException(
         `La suma de aportes (${totalAportes}) no puede superar el valor cobrado (${cuenta.valorCobrado})`,
       );
@@ -49,7 +60,7 @@ export class PlanillaService {
   private async verificarPropietario(cuentaCobroId: bigint, codigoTercero: string) {
     const cuenta = await this.prisma.cuentaCobro.findUnique({
       where: { id: cuentaCobroId },
-      select: { codigoTercero: true, estado: true, valorCobrado: true },
+      select: { codigoTercero: true, codigoTerceroSupervisor: true, estado: true, valorCobrado: true },
     });
     if (!cuenta) throw new NotFoundException('Cuenta de cobro no encontrada');
     if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException();
