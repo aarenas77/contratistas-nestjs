@@ -1,0 +1,249 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  CONTRATISTA
+  SUPERVISOR
+  APROBADOR
+}
+
+enum EstadoCuentaCobro {
+  BORRADOR
+  RADICADA
+  EN_REVISION_SUPERVISOR
+  DEVUELTA_CONTRATISTA
+  APROBADA_SUPERVISOR
+  EN_REVISION_APROBADOR
+  RECHAZADA_APROBADOR
+  APROBADA_FINAL
+  ENVIADA_CONTABILIDAD
+}
+
+enum EstadoSeccion {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+  SIN_OBSERVACIONES
+}
+
+model Contrato {
+  id                         BigInt    @id @default(autoincrement())
+  codigoContrato             Int       @unique @map("codigo_contrato")
+  consecutivo                String
+  descripcion                String
+  codigoTercero              String    @map("codigo_tercero")
+  valor                      Decimal   @db.Decimal(18, 2)
+  totalPago                  Decimal   @map("total_pago") @db.Decimal(18, 2)
+  estado                     String    @default("A")
+  fechaElaboracion           DateTime  @map("fecha_elaboracion") @db.Date
+  fechaAprobacion            DateTime? @map("fecha_aprobacion") @db.Date
+  fechaFin                   DateTime? @map("fecha_fin") @db.Date
+  fechaRegistro              DateTime  @map("fecha_registro") @db.Date
+  fechaInicioSecop           DateTime? @map("fecha_inicio_secop") @db.Date
+  plazoDias                  Int       @map("plazo_dias")
+  tipoPlazo                  String    @default("D") @map("tipo_plazo")
+  consecutivoCompromiso      Int       @map("consecutivo_compromiso")
+  estadoCompromiso           String    @map("estado_compromiso")
+  numeroActaInicio           Int?      @map("numero_acta_inicio")
+  saldoDisponibleOtrosGastos Decimal   @default(0) @map("saldo_disponible_otros_gastos") @db.Decimal(18, 2)
+  idSupervisor               String?   @map("id_supervisor")
+  codigoDependencia          Int?      @map("codigo_dependencia")
+  codigoMempresa             BigInt    @default(9999999999) @map("codigo_mempresa")
+  createdAt                  DateTime  @default(now()) @map("created_at")
+
+  cuentasCobro CuentaCobro[]
+
+  @@index([codigoTercero])
+  @@map("contratos")
+}
+
+model Usuario {
+  id                 BigInt   @id @default(autoincrement())
+  username           String   @unique
+  passwordHash       String   @map("password_hash")
+  nombre             String
+  email              String?  @unique
+  codigoTercero      String   @map("codigo_tercero")
+  userIdentification String   @map("user_identification")
+  rol                Rol
+  activo             Boolean  @default(true)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("usuarios")
+}
+
+model CuentaCobro {
+  id                      BigInt            @id @default(autoincrement())
+  ticket                  Int               @default(autoincrement()) @unique
+  codigoContrato          Int               @map("codigo_contrato")
+  codigoTercero           String            @map("codigo_tercero")
+  codigoTerceroSupervisor String?           @map("codigo_tercero_supervisor")
+  estado                  EstadoCuentaCobro @default(BORRADOR)
+  fechaSolicitud          DateTime?         @map("fecha_solicitud")
+  fechaInicio             DateTime          @map("fecha_inicio") @db.Date
+  fechaFin                DateTime          @map("fecha_fin") @db.Date
+  valorCobrado            Decimal           @map("valor_cobrado") @db.Decimal(18, 2)
+  observaciones           String?
+  declaracion             Boolean           @default(false)
+  createdAt               DateTime          @default(now()) @map("created_at")
+  updatedAt               DateTime          @updatedAt @map("updated_at")
+
+  contrato           Contrato          @relation(fields: [codigoContrato], references: [codigoContrato])
+  historialEstados   HistorialEstado[]
+  planilla           Planilla?
+  checklistItems     ChecklistRetefuente[]
+  actividades        Actividad[]
+  gastos             OtroGasto[]
+  ejecucionFisica    EjecucionFisica?
+  adjuntos           Adjunto[]
+  informeSupervision InformeSupervision?
+
+  @@index([codigoContrato])
+  @@index([codigoTercero])
+  @@map("cuentas_cobro")
+}
+
+model HistorialEstado {
+  id             BigInt      @id @default(autoincrement())
+  cuentaCobroId  BigInt      @map("cuenta_cobro_id")
+  estadoAnterior String?     @map("estado_anterior")
+  estadoNuevo    String      @map("estado_nuevo")
+  usuarioId      String      @map("usuario_id")
+  usuarioNombre  String?     @map("usuario_nombre")
+  observacion    String?
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  cuentaCobro    CuentaCobro @relation(fields: [cuentaCobroId], references: [id])
+
+  @@map("historial_estados")
+}
+
+model Planilla {
+  id                    BigInt        @id @default(autoincrement())
+  cuentaCobroId         BigInt        @unique @map("cuenta_cobro_id")
+  plantillaPagoNo       Int?          @map("plantilla_pago_no")
+  fechaPago             DateTime?     @map("fecha_pago") @db.Date
+  periodoPagado         String?       @map("periodo_pagado")
+  ingresoBaseCotizacion Decimal?      @map("ingreso_base_cotizacion") @db.Decimal(18, 2)
+  aporteSalud           Decimal?      @map("aporte_salud") @db.Decimal(18, 2)
+  aportePension         Decimal?      @map("aporte_pension") @db.Decimal(18, 2)
+  aporteArl             Decimal?      @map("aporte_arl") @db.Decimal(18, 2)
+  valorPagado           Decimal?      @map("valor_pagado") @db.Decimal(18, 2)
+  tipoRiesgoArl         String?       @map("tipo_riesgo_arl")
+  estadoRevision        EstadoSeccion @default(PENDIENTE) @map("estado_revision")
+  observacionRevision   String?       @map("observacion_revision")
+  idAportante           String?       @map("id_aportante")
+  numeroPlanilla        String?       @map("numero_planilla")
+  urlPago               String?       @map("url_pago")
+  estadoPago            String?       @map("estado_pago")
+
+  cuentaCobro   CuentaCobro @relation(fields: [cuentaCobroId], references: [id])
+
+  @@map("planillas")
+}
+
+model ChecklistRetefuente {
+  id                  BigInt        @id @default(autoincrement())
+  cuentaCobroId       BigInt        @map("cuenta_cobro_id")
+  idChecklist         Int           @map("id_checklist")
+  nombre              String?
+  kaNlCumple          Int?          @map("ka_nl_cumple")
+  observacion         String?
+  estadoRevision      EstadoSeccion @default(PENDIENTE) @map("estado_revision")
+  observacionRevision String?       @map("observacion_revision")
+
+  cuentaCobro   CuentaCobro @relation(fields: [cuentaCobroId], references: [id])
+
+  @@map("checklist_retefuente")
+}
+
+model Actividad {
+  id                  BigInt        @id @default(autoincrement())
+  cuentaCobroId       BigInt        @map("cuenta_cobro_id")
+  descripcion         String
+  fechaActividad      DateTime      @map("fecha_actividad") @db.Date
+  estadoRevision      EstadoSeccion @default(PENDIENTE) @map("estado_revision")
+  observacionRevision String?       @map("observacion_revision")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  adjuntos    Adjunto[]
+  cuentaCobro CuentaCobro @relation(fields: [cuentaCobroId], references: [id])
+
+  @@map("actividades")
+}
+
+model OtroGasto {
+  id                  BigInt        @id @default(autoincrement())
+  cuentaCobroId       BigInt        @map("cuenta_cobro_id")
+  fecha               DateTime      @db.Date
+  codigoConcepto      String        @map("codigo_concepto")
+  observacion         String?
+  valor               Decimal       @db.Decimal(18, 2)
+  estadoRevision      EstadoSeccion @default(PENDIENTE) @map("estado_revision")
+  observacionRevision String?       @map("observacion_revision")
+
+  adjuntos    Adjunto[]
+  cuentaCobro CuentaCobro @relation(fields: [cuentaCobroId], references: [id])
+
+  @@map("otros_gastos")
+}
+
+model EjecucionFisica {
+  id                  BigInt        @id @default(autoincrement())
+  cuentaCobroId       BigInt        @unique @map("cuenta_cobro_id")
+  porcentaje          Decimal?      @db.Decimal(5, 2)
+  justificacion       String?
+  estadoRevision      EstadoSeccion @default(PENDIENTE) @map("estado_revision")
+  observacionRevision String?       @map("observacion_revision")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  cuentaCobro CuentaCobro @relation(fields: [cuentaCobroId], references: [id])
+
+  @@map("ejecucion_fisica")
+}
+
+model Adjunto {
+  id            BigInt    @id @default(autoincrement())
+  cuentaCobroId BigInt    @map("cuenta_cobro_id")
+  actividadId   BigInt?   @map("actividad_id")
+  gastoId       BigInt?   @map("gasto_id")
+  nombre        String
+  mimeType      String?   @map("mime_type")
+  tamanioBytes  Int?      @map("tamanio_bytes")
+  datos         Bytes?
+  urlStorage    String?   @map("url_storage")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  cuentaCobro CuentaCobro @relation(fields: [cuentaCobroId], references: [id])
+  actividad   Actividad?  @relation(fields: [actividadId], references: [id])
+  gasto       OtroGasto?  @relation(fields: [gastoId], references: [id])
+
+  @@map("adjuntos")
+}
+
+model InformeSupervision {
+  id            BigInt    @id @default(autoincrement())
+  cuentaCobroId BigInt    @unique @map("cuenta_cobro_id")
+  supervisorId  String    @map("supervisor_id")
+  contenido     Json?
+  estado        String    @default("BORRADOR")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  cuentaCobro CuentaCobro @relation(fields: [cuentaCobroId], references: [id])
+
+  @@map("informes_supervision")
+}

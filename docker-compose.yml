@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cuentas_cobro_db
+    environment:
+      POSTGRES_USER: cuentas_user
+      POSTGRES_PASSWORD: cuentas_pass
+      POSTGRES_DB: cuentas_cobro
+    ports:
+      - '5432:5432'
+    volumes:
+      - cuentas_cobro_data:/var/lib/postgresql/data
+
+volumes:
+  cuentas_cobro_data:
