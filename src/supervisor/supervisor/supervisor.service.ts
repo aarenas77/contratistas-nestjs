@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma/prisma.service';
 import { ListarCuentasSupervisorDto } from '../dto/listar-cuentas-supervisor.dto';
 
@@ -55,5 +55,65 @@ export class SupervisorService {
       ultima: page >= totalPaginas - 1,
       timestamp: new Date().toISOString(),
     };
+  }
+
+  async aprobar(id: bigint, codigoTercero: string, usuarioNombre: string) {
+    const cuenta = await this.prisma.cuentaCobro.findUniqueOrThrow({ where: { id } });
+
+    if (cuenta.codigoTerceroSupervisor !== codigoTercero) {
+      throw new ForbiddenException('No tienes permisos para aprobar esta cuenta de cobro');
+    }
+
+    if (cuenta.estado !== 'RADICADA') {
+      throw new BadRequestException('Solo se puede aprobar una cuenta en estado RADICADA');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const actualizada = await tx.cuentaCobro.update({
+        where: { id },
+        data: { estado: 'APROBADA_SUPERVISOR' },
+      });
+      await tx.historialEstado.create({
+        data: {
+          cuentaCobroId: id,
+          estadoAnterior: 'RADICADA',
+          estadoNuevo: 'APROBADA_SUPERVISOR',
+          usuarioId: codigoTercero,
+          usuarioNombre,
+          observacion: 'Cuenta de cobro aprobada por el supervisor',
+        },
+      });
+      return { ...actualizada, mensaje: 'Cuenta de cobro aprobada por el supervisor' };
+    });
+  }
+
+  async rechazar(id: bigint, codigoTercero: string, usuarioNombre: string, observacion: string) {
+    const cuenta = await this.prisma.cuentaCobro.findUniqueOrThrow({ where: { id } });
+
+    if (cuenta.codigoTerceroSupervisor !== codigoTercero) {
+      throw new ForbiddenException('No tienes permisos para rechazar esta cuenta de cobro');
+    }
+
+    if (cuenta.estado !== 'RADICADA') {
+      throw new BadRequestException('Solo se puede rechazar una cuenta en estado RADICADA');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const actualizada = await tx.cuentaCobro.update({
+        where: { id },
+        data: { estado: 'DEVUELTA_CONTRATISTA', observaciones: observacion },
+      });
+      await tx.historialEstado.create({
+        data: {
+          cuentaCobroId: id,
+          estadoAnterior: 'RADICADA',
+          estadoNuevo: 'DEVUELTA_CONTRATISTA',
+          usuarioId: codigoTercero,
+          usuarioNombre,
+          observacion,
+        },
+      });
+      return { ...actualizada, mensaje: 'Cuenta de cobro devuelta al contratista' };
+    });
   }
 }
