@@ -6,13 +6,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma/prisma.service';
 import { CrearGastoDto } from '../dto/crear-gasto.dto';
+import { Rol } from '../../auth/interfaces/jwt-payload.interface';
 
 @Injectable()
 export class GastosService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listar(cuentaCobroId: bigint, codigoTercero: string) {
-    await this.verificarPropietario(cuentaCobroId, codigoTercero);
+  async listar(cuentaCobroId: bigint, codigoTercero: string, rol: Rol) {
+    await this.verificarAcceso(cuentaCobroId, codigoTercero, rol);
     return this.prisma.otroGasto.findMany({
       where: { cuentaCobroId },
       include: {
@@ -84,14 +85,30 @@ export class GastosService {
     ]);
   }
 
-  async getAdjunto(adjuntoId: bigint, codigoTercero: string) {
+  async getAdjunto(adjuntoId: bigint, codigoTercero: string, rol: Rol) {
     const adjunto = await this.prisma.adjunto.findUnique({
       where: { id: adjuntoId },
-      include: { cuentaCobro: { select: { codigoTercero: true } } },
+      include: { cuentaCobro: { select: { codigoTercero: true, codigoTerceroSupervisor: true } } },
     });
     if (!adjunto) throw new NotFoundException('Adjunto no encontrado');
-    if (adjunto.cuentaCobro.codigoTercero !== codigoTercero) throw new ForbiddenException();
+    const propietarioAdjunto = rol === Rol.SUPERVISOR
+      ? adjunto.cuentaCobro.codigoTerceroSupervisor
+      : adjunto.cuentaCobro.codigoTercero;
+    if (propietarioAdjunto !== codigoTercero) throw new ForbiddenException();
     return adjunto;
+  }
+
+  private async verificarAcceso(cuentaCobroId: bigint, codigoTercero: string, rol: Rol) {
+    const cuenta = await this.prisma.cuentaCobro.findUnique({
+      where: { id: cuentaCobroId },
+      select: { codigoTercero: true, codigoTerceroSupervisor: true, estado: true },
+    });
+    if (!cuenta) throw new NotFoundException('Cuenta de cobro no encontrada');
+    const propietario = rol === Rol.SUPERVISOR
+      ? cuenta.codigoTerceroSupervisor
+      : cuenta.codigoTercero;
+    if (propietario !== codigoTercero) throw new ForbiddenException();
+    return cuenta;
   }
 
   private async verificarPropietario(cuentaCobroId: bigint, codigoTercero: string) {

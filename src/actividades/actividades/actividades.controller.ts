@@ -30,14 +30,14 @@ export class ActividadesController {
 
   // IMPORTANTE: esta ruta va PRIMERO para evitar colisión con :cuentaCobroId
   @Get('adjunto/:adjuntoId')
-  @Roles(Rol.CONTRATISTA)
+  @Roles(Rol.CONTRATISTA, Rol.SUPERVISOR)
   @ApiOperation({ summary: 'Descargar adjunto de una actividad' })
   async getAdjunto(
     @Param('adjuntoId') adjuntoId: string,
     @CurrentUser() user: JwtPayload,
     @Res() res: Response,
   ) {
-    const adjunto = await this.service.getAdjunto(BigInt(adjuntoId), user.codigoTercero);
+    const adjunto = await this.service.getAdjunto(BigInt(adjuntoId), user.codigoTercero, user.rol);
     res.set({
       'Content-Type': adjunto.mimeType ?? 'application/octet-stream',
       'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(adjunto.nombre)}`,
@@ -47,10 +47,10 @@ export class ActividadesController {
   }
 
   @Get(':cuentaCobroId')
-  @Roles(Rol.CONTRATISTA)
+  @Roles(Rol.CONTRATISTA, Rol.SUPERVISOR)
   @ApiOperation({ summary: 'Listar actividades de una cuenta de cobro' })
   listar(@Param('cuentaCobroId') id: string, @CurrentUser() user: JwtPayload) {
-    return this.service.listar(BigInt(id), user.codigoTercero);
+    return this.service.listar(BigInt(id), user.codigoTercero, user.rol);
   }
 
   @Post(':cuentaCobroId')

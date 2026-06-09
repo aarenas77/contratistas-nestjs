@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SupervisorService } from './supervisor.service';
 import { ListarCuentasSupervisorDto } from '../dto/listar-cuentas-supervisor.dto';
 import { RechazarCuentaDto } from '../dto/rechazar-cuenta.dto';
+import { RechazarSeccionDto } from '../dto/rechazar-seccion.dto';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { Rol } from '../../auth/interfaces/jwt-payload.interface';
@@ -48,5 +49,107 @@ export class SupervisorController {
     @Body() dto: RechazarCuentaDto,
   ) {
     return this.service.rechazar(BigInt(id), user.codigoTercero, user.nombre, dto.observacion);
+  }
+
+  // ─── Revisión por Secciones ───────────────────────────────────────────────
+
+  @Post('cuentas-cobro/:id/secciones/informe-actividades/aprobar')
+  @Roles(Rol.SUPERVISOR)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Aprobar la sección de informe de actividades' })
+  aprobarInformeActividades(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.aprobarSeccionInformeActividades(BigInt(id), user.codigoTercero);
+  }
+
+  @Post('cuentas-cobro/:id/secciones/informe-actividades/rechazar')
+  @Roles(Rol.SUPERVISOR)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Rechazar la sección de informe de actividades' })
+  rechazarInformeActividades(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: RechazarSeccionDto,
+  ) {
+    return this.service.rechazarSeccionInformeActividades(BigInt(id), user.codigoTercero, dto.justificacion);
+  }
+
+  @Post('cuentas-cobro/:id/secciones/planilla/aprobar')
+  @Roles(Rol.SUPERVISOR)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Aprobar la sección de pago de planilla' })
+  aprobarPlanilla(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.aprobarSeccionPlanilla(BigInt(id), user.codigoTercero);
+  }
+
+  @Post('cuentas-cobro/:id/secciones/planilla/rechazar')
+  @Roles(Rol.SUPERVISOR)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Rechazar la sección de pago de planilla' })
+  rechazarPlanilla(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: RechazarSeccionDto,
+  ) {
+    return this.service.rechazarSeccionPlanilla(BigInt(id), user.codigoTercero, dto.justificacion);
+  }
+
+  @Post('cuentas-cobro/:id/secciones/retenciones/aprobar')
+  @Roles(Rol.SUPERVISOR)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Aprobar la sección de retenciones (checklist retefuente)' })
+  aprobarRetenciones(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.aprobarSeccionRetenciones(BigInt(id), user.codigoTercero);
+  }
+
+  @Post('cuentas-cobro/:id/secciones/retenciones/rechazar')
+  @Roles(Rol.SUPERVISOR)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Rechazar la sección de retenciones (checklist retefuente)' })
+  rechazarRetenciones(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: RechazarSeccionDto,
+  ) {
+    return this.service.rechazarSeccionRetenciones(BigInt(id), user.codigoTercero, dto.justificacion);
+  }
+
+  @Post('cuentas-cobro/:id/secciones/gastos-adicionales/aprobar')
+  @Roles(Rol.SUPERVISOR)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Aprobar la sección de gastos adicionales' })
+  aprobarGastosAdicionales(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.aprobarSeccionGastosAdicionales(BigInt(id), user.codigoTercero);
+  }
+
+  @Post('cuentas-cobro/:id/secciones/gastos-adicionales/rechazar')
+  @Roles(Rol.SUPERVISOR)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Rechazar la sección de gastos adicionales' })
+  rechazarGastosAdicionales(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: RechazarSeccionDto,
+  ) {
+    return this.service.rechazarSeccionGastosAdicionales(BigInt(id), user.codigoTercero, dto.justificacion);
+  }
+
+  @Post('cuentas-cobro/:id/secciones/ejecucion-fisica/aprobar')
+  @Roles(Rol.SUPERVISOR)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Aprobar la sección de ejecución física' })
+  aprobarEjecucionFisica(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.aprobarSeccionEjecucionFisica(BigInt(id), user.codigoTercero);
+  }
+
+  @Post('cuentas-cobro/:id/secciones/ejecucion-fisica/rechazar')
+  @Roles(Rol.SUPERVISOR)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Rechazar la sección de ejecución física' })
+  rechazarEjecucionFisica(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: RechazarSeccionDto,
+  ) {
+    return this.service.rechazarSeccionEjecucionFisica(BigInt(id), user.codigoTercero, dto.justificacion);
   }
 }

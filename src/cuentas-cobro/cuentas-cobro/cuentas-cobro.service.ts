@@ -228,6 +228,14 @@ export class CuentasCobroService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      const resetSeccion = { estadoRevision: 'PENDIENTE' as const, observacionRevision: null };
+      await Promise.all([
+        tx.actividad.updateMany({ where: { cuentaCobroId: id }, data: resetSeccion }),
+        tx.planilla.updateMany({ where: { cuentaCobroId: id }, data: resetSeccion }),
+        tx.checklistRetefuente.updateMany({ where: { cuentaCobroId: id }, data: resetSeccion }),
+        tx.otroGasto.updateMany({ where: { cuentaCobroId: id }, data: resetSeccion }),
+        tx.ejecucionFisica.updateMany({ where: { cuentaCobroId: id }, data: resetSeccion }),
+      ]);
       const actualizada = await tx.cuentaCobro.update({
         where: { id },
         data: { estado: 'RADICADA', fechaSolicitud: new Date() },
