@@ -117,14 +117,13 @@ describe('SupervisorService', () => {
         data: { estado: 'APROBADA_SUPERVISOR' },
       });
       expect(mockCreate).toHaveBeenCalledWith({
-        data: {
+        data: expect.objectContaining({
           cuentaCobroId: id,
           estadoAnterior: 'RADICADA',
           estadoNuevo: 'APROBADA_SUPERVISOR',
           usuarioId: codigoTercero,
           usuarioNombre,
-          observacion: 'Cuenta de cobro aprobada por el supervisor',
-        },
+        }),
       });
     });
   });

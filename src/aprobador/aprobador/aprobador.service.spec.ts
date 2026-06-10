@@ -192,48 +192,22 @@ describe('AprobadorService', () => {
       };
     }
 
-    it('aprueba la sección y liquida la cuenta cuando es la única sección con datos', async () => {
+    it('aprueba la sección sin liquidar la cuenta', async () => {
       mockPrismaService.cuentaCobro.findUniqueOrThrow.mockResolvedValue(cuentaEnRevision);
       const tx = buildTx();
       mockPrismaService.$transaction.mockImplementation(async (cb) => cb(tx));
 
       const result = await service.aprobarSeccionInformeActividades(id, codigoTercero, usuarioNombre);
 
-      expect(tx.cuentaCobro.update).toHaveBeenCalledWith({
-        where: { id },
-        data: { estado: 'LIQUIDADA' },
+      expect(tx.actividad.updateMany).toHaveBeenCalledWith({
+        where: { cuentaCobroId: id },
+        data: { estadoRevisionAprobador: 'APROBADO', observacionRevisionAprobador: null },
       });
-      expect(tx.historialEstado.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          cuentaCobroId: id,
-          estadoAnterior: 'EN_REVISION_APROBADOR',
-          estadoNuevo: 'LIQUIDADA',
-          usuarioId: codigoTercero,
-          usuarioNombre,
-        }),
-      });
+      expect(tx.cuentaCobro.update).not.toHaveBeenCalled();
       expect(result).toMatchObject({
         mensaje: 'Informe de actividades aprobado por el aprobador',
         seccion: 'INFORME_ACTIVIDADES',
         estado: 'APROBADO',
-        cuentaLiquidada: true,
-      });
-    });
-
-    it('aprueba la sección sin liquidar si quedan secciones pendientes', async () => {
-      mockPrismaService.cuentaCobro.findUniqueOrThrow.mockResolvedValue(cuentaEnRevision);
-      const tx = buildTx({
-        checklistRetefuente: { count: jest.fn().mockResolvedValue(2) },
-      });
-      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(tx));
-
-      const result = await service.aprobarSeccionInformeActividades(id, codigoTercero, usuarioNombre);
-
-      expect(tx.cuentaCobro.update).not.toHaveBeenCalled();
-      expect(result).toMatchObject({
-        seccion: 'INFORME_ACTIVIDADES',
-        estado: 'APROBADO',
-        cuentaLiquidada: false,
       });
     });
   });
@@ -269,7 +243,7 @@ describe('AprobadorService', () => {
       mockPrismaService.cuentaCobro.findUniqueOrThrow.mockResolvedValue(cuentaEnRevision);
     });
 
-    it('aprueba la sección y liquida la cuenta cuando es la última sección pendiente', async () => {
+    it('aprueba la sección sin liquidar la cuenta', async () => {
       (mockPrismaService as any).planilla = { findUnique: jest.fn().mockResolvedValue({ id: BigInt(1) }) };
       const tx = buildTx();
       mockPrismaService.$transaction.mockImplementation(async (cb) => cb(tx));
@@ -280,35 +254,11 @@ describe('AprobadorService', () => {
         where: { cuentaCobroId: id },
         data: { estadoRevisionAprobador: 'APROBADO', observacionRevisionAprobador: null },
       });
-      expect(tx.cuentaCobro.update).toHaveBeenCalledWith({
-        where: { id },
-        data: { estado: 'LIQUIDADA' },
-      });
+      expect(tx.cuentaCobro.update).not.toHaveBeenCalled();
       expect(result).toMatchObject({
         mensaje: 'Pago de planilla aprobado por el aprobador',
         seccion: 'PLANILLA',
         estado: 'APROBADO',
-        cuentaLiquidada: true,
-      });
-    });
-
-    it('no liquida si la planilla recién aprobada todavía no refleja APROBADO en la verificación', async () => {
-      (mockPrismaService as any).planilla = { findUnique: jest.fn().mockResolvedValue({ id: BigInt(1) }) };
-      const tx = buildTx({
-        planilla: {
-          findUnique: jest.fn().mockResolvedValue({ estadoRevisionAprobador: 'PENDIENTE' }),
-          update: jest.fn().mockResolvedValue({}),
-        },
-      });
-      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(tx));
-
-      const result = await service.aprobarSeccionPlanilla(id, codigoTercero, usuarioNombre);
-
-      expect(tx.cuentaCobro.update).not.toHaveBeenCalled();
-      expect(result).toMatchObject({
-        seccion: 'PLANILLA',
-        estado: 'APROBADO',
-        cuentaLiquidada: false,
       });
     });
   });
@@ -324,7 +274,7 @@ describe('AprobadorService', () => {
       estado: 'EN_REVISION_APROBADOR',
     };
 
-    it('aprueba la sección y liquida la cuenta cuando es la última sección pendiente', async () => {
+    it('aprueba la sección sin liquidar la cuenta', async () => {
       mockPrismaService.cuentaCobro.findUniqueOrThrow.mockResolvedValue(cuentaEnRevision);
       (mockPrismaService as any).ejecucionFisica = { findUnique: jest.fn().mockResolvedValue({ id: BigInt(1) }) };
 
@@ -348,15 +298,11 @@ describe('AprobadorService', () => {
         where: { cuentaCobroId: id },
         data: { estadoRevisionAprobador: 'APROBADO', observacionRevisionAprobador: null },
       });
-      expect(tx.cuentaCobro.update).toHaveBeenCalledWith({
-        where: { id },
-        data: { estado: 'LIQUIDADA' },
-      });
+      expect(tx.cuentaCobro.update).not.toHaveBeenCalled();
       expect(result).toMatchObject({
         mensaje: 'Ejecución física aprobada por el aprobador',
         seccion: 'EJECUCION_FISICA',
         estado: 'APROBADO',
-        cuentaLiquidada: true,
       });
     });
   });

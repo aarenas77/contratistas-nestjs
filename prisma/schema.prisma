@@ -15,6 +15,7 @@ enum Rol {
   CONTRATISTA
   SUPERVISOR
   APROBADOR
+  ADMINISTRADOR
 }
 
 enum EstadoCuentaCobro {
@@ -89,6 +90,7 @@ model CuentaCobro {
   codigoContrato          Int               @map("codigo_contrato")
   codigoTercero           String            @map("codigo_tercero")
   codigoTerceroSupervisor String?           @map("codigo_tercero_supervisor")
+  codigoTerceroAprobador  String?           @map("codigo_tercero_aprobador")
   estado                  EstadoCuentaCobro @default(BORRADOR)
   fechaSolicitud          DateTime?         @map("fecha_solicitud")
   fechaInicio             DateTime          @map("fecha_inicio") @db.Date
@@ -141,9 +143,11 @@ model Planilla {
   aporteArl             Decimal?      @map("aporte_arl") @db.Decimal(18, 2)
   valorPagado           Decimal?      @map("valor_pagado") @db.Decimal(18, 2)
   tipoRiesgoArl         String?       @map("tipo_riesgo_arl")
-  estadoRevision        EstadoSeccion @default(PENDIENTE) @map("estado_revision")
-  observacionRevision   String?       @map("observacion_revision")
-  idAportante           String?       @map("id_aportante")
+  estadoRevision               EstadoSeccion @default(PENDIENTE) @map("estado_revision")
+  observacionRevision          String?       @map("observacion_revision")
+  estadoRevisionAprobador      EstadoSeccion @default(PENDIENTE) @map("estado_revision_aprobador")
+  observacionRevisionAprobador String?       @map("observacion_revision_aprobador")
+  idAportante                  String?       @map("id_aportante")
   numeroPlanilla        String?       @map("numero_planilla")
   urlPago               String?       @map("url_pago")
   estadoPago            String?       @map("estado_pago")
@@ -160,8 +164,10 @@ model ChecklistRetefuente {
   nombre              String?
   kaNlCumple          Int?          @map("ka_nl_cumple")
   observacion         String?
-  estadoRevision      EstadoSeccion @default(PENDIENTE) @map("estado_revision")
-  observacionRevision String?       @map("observacion_revision")
+  estadoRevision               EstadoSeccion @default(PENDIENTE) @map("estado_revision")
+  observacionRevision          String?       @map("observacion_revision")
+  estadoRevisionAprobador      EstadoSeccion @default(PENDIENTE) @map("estado_revision_aprobador")
+  observacionRevisionAprobador String?       @map("observacion_revision_aprobador")
 
   cuentaCobro   CuentaCobro @relation(fields: [cuentaCobroId], references: [id])
 
@@ -173,10 +179,12 @@ model Actividad {
   cuentaCobroId       BigInt        @map("cuenta_cobro_id")
   descripcion         String
   fechaActividad      DateTime      @map("fecha_actividad") @db.Date
-  estadoRevision      EstadoSeccion @default(PENDIENTE) @map("estado_revision")
-  observacionRevision String?       @map("observacion_revision")
-  createdAt           DateTime      @default(now()) @map("created_at")
-  updatedAt           DateTime      @updatedAt @map("updated_at")
+  estadoRevision               EstadoSeccion @default(PENDIENTE) @map("estado_revision")
+  observacionRevision          String?       @map("observacion_revision")
+  estadoRevisionAprobador      EstadoSeccion @default(PENDIENTE) @map("estado_revision_aprobador")
+  observacionRevisionAprobador String?       @map("observacion_revision_aprobador")
+  createdAt                    DateTime      @default(now()) @map("created_at")
+  updatedAt                    DateTime      @updatedAt @map("updated_at")
 
   adjuntos    Adjunto[]
   cuentaCobro CuentaCobro @relation(fields: [cuentaCobroId], references: [id])
@@ -191,8 +199,10 @@ model OtroGasto {
   codigoConcepto      String        @map("codigo_concepto")
   observacion         String?
   valor               Decimal       @db.Decimal(18, 2)
-  estadoRevision      EstadoSeccion @default(PENDIENTE) @map("estado_revision")
-  observacionRevision String?       @map("observacion_revision")
+  estadoRevision               EstadoSeccion @default(PENDIENTE) @map("estado_revision")
+  observacionRevision          String?       @map("observacion_revision")
+  estadoRevisionAprobador      EstadoSeccion @default(PENDIENTE) @map("estado_revision_aprobador")
+  observacionRevisionAprobador String?       @map("observacion_revision_aprobador")
 
   adjuntos    Adjunto[]
   cuentaCobro CuentaCobro @relation(fields: [cuentaCobroId], references: [id])
@@ -205,9 +215,11 @@ model EjecucionFisica {
   cuentaCobroId       BigInt        @unique @map("cuenta_cobro_id")
   porcentaje          Decimal?      @db.Decimal(5, 2)
   justificacion       String?
-  estadoRevision      EstadoSeccion @default(PENDIENTE) @map("estado_revision")
-  observacionRevision String?       @map("observacion_revision")
-  updatedAt           DateTime      @updatedAt @map("updated_at")
+  estadoRevision               EstadoSeccion @default(PENDIENTE) @map("estado_revision")
+  observacionRevision          String?       @map("observacion_revision")
+  estadoRevisionAprobador      EstadoSeccion @default(PENDIENTE) @map("estado_revision_aprobador")
+  observacionRevisionAprobador String?       @map("observacion_revision_aprobador")
+  updatedAt                    DateTime      @updatedAt @map("updated_at")
 
   cuentaCobro CuentaCobro @relation(fields: [cuentaCobroId], references: [id])
 

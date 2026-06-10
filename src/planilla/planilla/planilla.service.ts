@@ -14,11 +14,15 @@ export class PlanillaService {
   async obtener(cuentaCobroId: bigint, codigoTercero: string, rol: string) {
     const cuenta = await this.prisma.cuentaCobro.findUnique({
       where: { id: cuentaCobroId },
-      select: { codigoTercero: true, codigoTerceroSupervisor: true },
+      select: { codigoTercero: true, codigoTerceroSupervisor: true, codigoTerceroAprobador: true },
     });
     if (!cuenta) throw new NotFoundException('Cuenta de cobro no encontrada');
     if (rol === 'SUPERVISOR') {
       if (!cuenta.codigoTerceroSupervisor || cuenta.codigoTerceroSupervisor !== codigoTercero) {
+        throw new ForbiddenException('No tienes permisos para acceder a esta planilla');
+      }
+    } else if (rol === 'APROBADOR') {
+      if (!cuenta.codigoTerceroAprobador || cuenta.codigoTerceroAprobador !== codigoTercero) {
         throw new ForbiddenException('No tienes permisos para acceder a esta planilla');
       }
     } else {

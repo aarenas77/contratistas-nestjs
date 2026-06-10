@@ -14,7 +14,7 @@ export class ChecklistRetefuenteController {
   constructor(private readonly service: ChecklistRetefuenteService) {}
 
   @Get(':cuentaCobroId')
-  @Roles(Rol.CONTRATISTA, Rol.SUPERVISOR)
+  @Roles(Rol.CONTRATISTA, Rol.SUPERVISOR, Rol.APROBADOR)
   @ApiOperation({ summary: 'Obtener checklist de retefuente (se inicializa si no existe)' })
   obtener(@Param('cuentaCobroId') id: string, @CurrentUser() user: JwtPayload) {
     return this.service.obtener(BigInt(id), user.codigoTercero, user.rol);

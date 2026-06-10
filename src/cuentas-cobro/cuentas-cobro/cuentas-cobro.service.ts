@@ -1,19 +1,26 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma/prisma.service';
 import { CreateCuentaCobroDto } from '../dto/create-cuenta-cobro.dto';
 import { ListarCuentasCobroDto } from '../dto/listar-cuentas-cobro.dto';
 import { EstadoCuentaCobro } from '@prisma/client';
 
-const ESTADO_LEGACY: Record<EstadoCuentaCobro, { idEstado: number; estado: string }> = {
-  BORRADOR:               { idEstado: 0, estado: 'BORRADOR' },
-  RADICADA:               { idEstado: 1, estado: 'RADICADA' },
+const ESTADO_LEGACY: Record<
+  EstadoCuentaCobro,
+  { idEstado: number; estado: string }
+> = {
+  BORRADOR: { idEstado: 0, estado: 'BORRADOR' },
+  RADICADA: { idEstado: 1, estado: 'RADICADA' },
   EN_REVISION_SUPERVISOR: { idEstado: 2, estado: 'PENDIENTE' },
-  DEVUELTA_CONTRATISTA:   { idEstado: 3, estado: 'DEVUELTA' },
-  APROBADA_SUPERVISOR:    { idEstado: 4, estado: 'APROBADA_SUPERVISOR' },
-  EN_REVISION_APROBADOR:  { idEstado: 5, estado: 'EN_REVISION_APROBADOR' },
-  RECHAZADA_APROBADOR:    { idEstado: 6, estado: 'RECHAZADA' },
-  LIQUIDADA:              { idEstado: 7, estado: 'APROBADA' },
-  ENVIADA_CONTABILIDAD:   { idEstado: 8, estado: 'ENVIADA_CONTABILIDAD' },
+  DEVUELTA_CONTRATISTA: { idEstado: 3, estado: 'DEVUELTA' },
+  APROBADA_SUPERVISOR: { idEstado: 4, estado: 'APROBADA_SUPERVISOR' },
+  EN_REVISION_APROBADOR: { idEstado: 5, estado: 'EN_REVISION_APROBADOR' },
+  RECHAZADA_APROBADOR: { idEstado: 6, estado: 'RECHAZADA' },
+  LIQUIDADA: { idEstado: 7, estado: 'LIQUIDADA' },
+  ENVIADA_CONTABILIDAD: { idEstado: 8, estado: 'ENVIADA_CONTABILIDAD' },
 };
 
 @Injectable()
@@ -71,7 +78,12 @@ export class CuentasCobroService {
         contrato: c.contrato.consecutivo,
         codigoContrato: c.codigoContrato,
         codigoTercero: Number(c.codigoTercero),
-        codigoTerceroSupervisor: c.codigoTerceroSupervisor ? Number(c.codigoTerceroSupervisor) : null,
+        codigoTerceroSupervisor: c.codigoTerceroSupervisor
+          ? Number(c.codigoTerceroSupervisor)
+          : null,
+        codigoTerceroAprobador: c.codigoTerceroAprobador
+          ? Number(c.codigoTerceroAprobador)
+          : null,
         idEstado,
         estado,
         fechaInicio: c.fechaInicio,
@@ -113,13 +125,20 @@ export class CuentasCobroService {
     // APROBADOR puede ver todas las cuentas
     if (rol !== 'APROBADOR') {
       if (rol === 'SUPERVISOR') {
-        if (!cuenta.codigoTerceroSupervisor || cuenta.codigoTerceroSupervisor !== codigoTercero) {
-          throw new ForbiddenException('No tienes permisos para ver esta cuenta de cobro');
+        if (
+          !cuenta.codigoTerceroSupervisor ||
+          cuenta.codigoTerceroSupervisor !== codigoTercero
+        ) {
+          throw new ForbiddenException(
+            'No tienes permisos para ver esta cuenta de cobro',
+          );
         }
       } else {
         // CONTRATISTA
         if (cuenta.codigoTercero !== codigoTercero) {
-          throw new ForbiddenException('No tienes permisos para ver esta cuenta de cobro');
+          throw new ForbiddenException(
+            'No tienes permisos para ver esta cuenta de cobro',
+          );
         }
       }
     }
@@ -156,14 +175,23 @@ export class CuentasCobroService {
           select: { idChecklist: true, nombre: true, kaNlCumple: true },
         },
         gastos: {
-          select: { id: true, codigoConcepto: true, valor: true, fecha: true, observacion: true },
+          select: {
+            id: true,
+            codigoConcepto: true,
+            valor: true,
+            fecha: true,
+            observacion: true,
+          },
         },
       },
     });
 
     if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException();
 
-    const totalGastos = cuenta.gastos.reduce((acc, g) => acc + Number(g.valor), 0);
+    const totalGastos = cuenta.gastos.reduce(
+      (acc, g) => acc + Number(g.valor),
+      0,
+    );
 
     return {
       cuentaCobroId: Number(id),
@@ -178,7 +206,8 @@ export class CuentasCobroService {
       planilla: cuenta.planilla,
       checklist: {
         total: cuenta.checklistItems.length,
-        respondidos: cuenta.checklistItems.filter((c) => c.kaNlCumple !== null).length,
+        respondidos: cuenta.checklistItems.filter((c) => c.kaNlCumple !== null)
+          .length,
         items: cuenta.checklistItems,
       },
       gastos: {
@@ -206,35 +235,67 @@ export class CuentasCobroService {
     const fechaFin = new Date(cuenta.fechaFin);
     fechaFin.setHours(0, 0, 0, 0);
     if (hoy < fechaInicio || hoy > fechaFin) {
-      throw new BadRequestException('La cuenta solo puede radicarse dentro del período vigente (fechaInicio - fechaFin)');
+      throw new BadRequestException(
+        'La cuenta solo puede radicarse dentro del período vigente (fechaInicio - fechaFin)',
+      );
     }
 
     if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException();
     if (cuenta.estado !== 'BORRADOR') {
-      throw new BadRequestException('La cuenta ya fue radicada o no está en estado BORRADOR');
+      throw new BadRequestException(
+        'La cuenta ya fue radicada o no está en estado BORRADOR',
+      );
     }
     if (cuenta.actividades.length === 0) {
-      throw new BadRequestException('Debe registrar al menos una actividad antes de radicar');
+      throw new BadRequestException(
+        'Debe registrar al menos una actividad antes de radicar',
+      );
     }
     if (!cuenta.planilla) {
-      throw new BadRequestException('Debe registrar la planilla de seguridad social antes de radicar');
+      throw new BadRequestException(
+        'Debe registrar la planilla de seguridad social antes de radicar',
+      );
     }
     if (cuenta.checklistItems.length < 6) {
-      throw new BadRequestException('Debe consultar y completar el checklist de retefuente antes de radicar');
+      throw new BadRequestException(
+        'Debe consultar y completar el checklist de retefuente antes de radicar',
+      );
     }
-    const sinResponder = cuenta.checklistItems.filter((c) => c.kaNlCumple === null).length;
+    const sinResponder = cuenta.checklistItems.filter(
+      (c) => c.kaNlCumple === null,
+    ).length;
     if (sinResponder > 0) {
-      throw new BadRequestException(`Quedan ${sinResponder} ítem(s) del checklist sin responder`);
+      throw new BadRequestException(
+        `Quedan ${sinResponder} ítem(s) del checklist sin responder`,
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const resetSeccion = { estadoRevision: 'PENDIENTE' as const, observacionRevision: null };
+      const resetSeccion = {
+        estadoRevision: 'PENDIENTE' as const,
+        observacionRevision: null,
+      };
       await Promise.all([
-        tx.actividad.updateMany({ where: { cuentaCobroId: id }, data: resetSeccion }),
-        tx.planilla.updateMany({ where: { cuentaCobroId: id }, data: resetSeccion }),
-        tx.checklistRetefuente.updateMany({ where: { cuentaCobroId: id }, data: resetSeccion }),
-        tx.otroGasto.updateMany({ where: { cuentaCobroId: id }, data: resetSeccion }),
-        tx.ejecucionFisica.updateMany({ where: { cuentaCobroId: id }, data: resetSeccion }),
+        tx.actividad.updateMany({
+          where: { cuentaCobroId: id },
+          data: resetSeccion,
+        }),
+        tx.planilla.updateMany({
+          where: { cuentaCobroId: id },
+          data: resetSeccion,
+        }),
+        tx.checklistRetefuente.updateMany({
+          where: { cuentaCobroId: id },
+          data: resetSeccion,
+        }),
+        tx.otroGasto.updateMany({
+          where: { cuentaCobroId: id },
+          data: resetSeccion,
+        }),
+        tx.ejecucionFisica.updateMany({
+          where: { cuentaCobroId: id },
+          data: resetSeccion,
+        }),
       ]);
       const actualizada = await tx.cuentaCobro.update({
         where: { id },
@@ -250,7 +311,10 @@ export class CuentasCobroService {
           observacion: 'Cuenta de cobro radicada por el contratista',
         },
       });
-      return { ...actualizada, mensaje: 'Cuenta de cobro radicada exitosamente' };
+      return {
+        ...actualizada,
+        mensaje: 'Cuenta de cobro radicada exitosamente',
+      };
     });
   }
 }

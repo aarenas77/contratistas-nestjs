@@ -3,7 +3,7 @@ import { IsString, IsEnum, IsOptional, IsNumber } from 'class-validator';
 import { Rol } from '../interfaces/jwt-payload.interface';
 
 export class DevTokenDto {
-  @ApiProperty({ enum: Rol, example: Rol.SUPERVISOR })
+  @ApiProperty({ enum: Rol, example: Rol.ADMINISTRADOR })
   @IsEnum(Rol)
   rol: Rol;
 

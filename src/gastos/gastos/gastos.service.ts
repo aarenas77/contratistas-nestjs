@@ -88,12 +88,13 @@ export class GastosService {
   async getAdjunto(adjuntoId: bigint, codigoTercero: string, rol: Rol) {
     const adjunto = await this.prisma.adjunto.findUnique({
       where: { id: adjuntoId },
-      include: { cuentaCobro: { select: { codigoTercero: true, codigoTerceroSupervisor: true } } },
+      include: { cuentaCobro: { select: { codigoTercero: true, codigoTerceroSupervisor: true, codigoTerceroAprobador: true } } },
     });
     if (!adjunto) throw new NotFoundException('Adjunto no encontrado');
-    const propietarioAdjunto = rol === Rol.SUPERVISOR
-      ? adjunto.cuentaCobro.codigoTerceroSupervisor
-      : adjunto.cuentaCobro.codigoTercero;
+    let propietarioAdjunto: string | null;
+    if (rol === Rol.SUPERVISOR) propietarioAdjunto = adjunto.cuentaCobro.codigoTerceroSupervisor;
+    else if (rol === Rol.APROBADOR) propietarioAdjunto = adjunto.cuentaCobro.codigoTerceroAprobador;
+    else propietarioAdjunto = adjunto.cuentaCobro.codigoTercero;
     if (propietarioAdjunto !== codigoTercero) throw new ForbiddenException();
     return adjunto;
   }
@@ -101,12 +102,13 @@ export class GastosService {
   private async verificarAcceso(cuentaCobroId: bigint, codigoTercero: string, rol: Rol) {
     const cuenta = await this.prisma.cuentaCobro.findUnique({
       where: { id: cuentaCobroId },
-      select: { codigoTercero: true, codigoTerceroSupervisor: true, estado: true },
+      select: { codigoTercero: true, codigoTerceroSupervisor: true, codigoTerceroAprobador: true, estado: true },
     });
     if (!cuenta) throw new NotFoundException('Cuenta de cobro no encontrada');
-    const propietario = rol === Rol.SUPERVISOR
-      ? cuenta.codigoTerceroSupervisor
-      : cuenta.codigoTercero;
+    let propietario: string | null;
+    if (rol === Rol.SUPERVISOR) propietario = cuenta.codigoTerceroSupervisor;
+    else if (rol === Rol.APROBADOR) propietario = cuenta.codigoTerceroAprobador;
+    else propietario = cuenta.codigoTercero;
     if (propietario !== codigoTercero) throw new ForbiddenException();
     return cuenta;
   }

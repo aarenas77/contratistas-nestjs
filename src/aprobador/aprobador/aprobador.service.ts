@@ -178,29 +178,6 @@ export class AprobadorService {
     return true;
   }
 
-  private async liquidarSiCorresponde(tx: any, id: bigint, codigoTercero: string, usuarioNombre: string): Promise<boolean> {
-    const todasAprobadas = await this.verificarTodasSeccionesAprobadas(tx, id);
-    if (!todasAprobadas) {
-      return false;
-    }
-
-    await tx.cuentaCobro.update({
-      where: { id },
-      data: { estado: 'LIQUIDADA' },
-    });
-    await tx.historialEstado.create({
-      data: {
-        cuentaCobroId: id,
-        estadoAnterior: 'EN_REVISION_APROBADOR',
-        estadoNuevo: 'LIQUIDADA',
-        usuarioId: codigoTercero,
-        usuarioNombre,
-        observacion: 'Cuenta de cobro liquidada automáticamente al aprobar todas las secciones',
-      },
-    });
-    return true;
-  }
-
   async aprobarSeccionInformeActividades(id: bigint, codigoTercero: string, usuarioNombre: string) {
     const cuenta = await this.validarPermisoSeccionAprobador(id, codigoTercero);
     return this.prisma.$transaction(async (tx) => {
@@ -212,8 +189,7 @@ export class AprobadorService {
       if (result.count === 0) {
         throw new BadRequestException('No hay actividades registradas en esta cuenta');
       }
-      const cuentaLiquidada = await this.liquidarSiCorresponde(tx, id, codigoTercero, usuarioNombre);
-      return { mensaje: 'Informe de actividades aprobado por el aprobador', seccion: 'INFORME_ACTIVIDADES', estado: 'APROBADO', cuentaLiquidada };
+      return { mensaje: 'Informe de actividades aprobado por el aprobador', seccion: 'INFORME_ACTIVIDADES', estado: 'APROBADO' };
     });
   }
 
@@ -244,8 +220,7 @@ export class AprobadorService {
         where: { cuentaCobroId: id },
         data: { estadoRevisionAprobador: 'APROBADO', observacionRevisionAprobador: null },
       });
-      const cuentaLiquidada = await this.liquidarSiCorresponde(tx, id, codigoTercero, usuarioNombre);
-      return { mensaje: 'Pago de planilla aprobado por el aprobador', seccion: 'PLANILLA', estado: 'APROBADO', cuentaLiquidada };
+      return { mensaje: 'Pago de planilla aprobado por el aprobador', seccion: 'PLANILLA', estado: 'APROBADO' };
     });
   }
 
@@ -276,8 +251,7 @@ export class AprobadorService {
       if (result.count === 0) {
         throw new BadRequestException('No hay ítems de retenciones registrados en esta cuenta');
       }
-      const cuentaLiquidada = await this.liquidarSiCorresponde(tx, id, codigoTercero, usuarioNombre);
-      return { mensaje: 'Retenciones aprobadas por el aprobador', seccion: 'RETENCIONES', estado: 'APROBADO', cuentaLiquidada };
+      return { mensaje: 'Retenciones aprobadas por el aprobador', seccion: 'RETENCIONES', estado: 'APROBADO' };
     });
   }
 
@@ -307,8 +281,7 @@ export class AprobadorService {
       if (result.count === 0) {
         throw new BadRequestException('No hay gastos adicionales registrados en esta cuenta');
       }
-      const cuentaLiquidada = await this.liquidarSiCorresponde(tx, id, codigoTercero, usuarioNombre);
-      return { mensaje: 'Gastos adicionales aprobados por el aprobador', seccion: 'GASTOS_ADICIONALES', estado: 'APROBADO', cuentaLiquidada };
+      return { mensaje: 'Gastos adicionales aprobados por el aprobador', seccion: 'GASTOS_ADICIONALES', estado: 'APROBADO' };
     });
   }
 
@@ -339,8 +312,7 @@ export class AprobadorService {
         where: { cuentaCobroId: id },
         data: { estadoRevisionAprobador: 'APROBADO', observacionRevisionAprobador: null },
       });
-      const cuentaLiquidada = await this.liquidarSiCorresponde(tx, id, codigoTercero, usuarioNombre);
-      return { mensaje: 'Ejecución física aprobada por el aprobador', seccion: 'EJECUCION_FISICA', estado: 'APROBADO', cuentaLiquidada };
+      return { mensaje: 'Ejecución física aprobada por el aprobador', seccion: 'EJECUCION_FISICA', estado: 'APROBADO' };
     });
   }
 

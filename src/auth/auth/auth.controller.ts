@@ -27,10 +27,10 @@ export class AuthController {
   @Roles(Rol.APROBADOR)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Crear usuario (requiere rol APROBADOR)',
+    summary: 'Crear usuario (requiere rol APROBADOR o ADMINISTRADOR)',
     description:
-      'Crea contratistas, supervisores o aprobadores. ' +
-      'Para el primer usuario usa POST /auth/dev-token para obtener un token APROBADOR temporal.',
+      'Crea contratistas, supervisores, aprobadores o administradores. ' +
+      'Para el primer usuario usa POST /auth/dev-token para obtener un token temporal.',
   })
   createUser(@Body() dto: CreateUserDto) {
     return this.service.createUser(dto);

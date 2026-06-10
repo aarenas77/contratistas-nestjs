@@ -147,6 +147,117 @@ Sin body.
 
 ---
 
+## Módulo Registro de Contratistas — `/registro-contratistas`
+
+Registro por pasos para contratistas invitados (sin autenticación previa). El frontend conserva
+los datos extraídos y los reenvía al finalizar (flujo *stateless*).
+
+> **Nota temporal:** el `codigoTercero` real proviene de un sistema de precarga aún no integrado.
+> Mientras tanto se usa el endpoint `codigo-tercero-temporal` que genera un placeholder único.
+
+| Método | Ruta | Roles | Descripción |
+|---|---|---|---|
+| `POST` | `/registro-contratistas/extraer` | Público | Extrae datos del RUT y la certificación bancaria desde los PDFs |
+| `POST` | `/registro-contratistas/codigo-tercero-temporal` | Público | Genera un `codigoTercero` temporal |
+| `POST` | `/registro-contratistas/finalizar` | Público | Crea el usuario contratista y devuelve sus credenciales |
+
+---
+
+### `POST /registro-contratistas/extraer`
+
+**Body** `multipart/form-data`
+```
+rut:                 archivo PDF (max 10 MB, requerido)
+certificadoBancario: archivo PDF (max 10 MB, requerido)
+```
+
+**Response `200`**
+```json
+{
+  "rut": {
+    "codigoVerificacion": 5,
+    "tipoDocumento": "Cédula de Ciudadanía",
+    "numeroIdentificacion": "1036662102",
+    "nit": "1036662102",
+    "primerApellido": "OTERO",
+    "segundoApellido": "ARANGO",
+    "primerNombre": "BRANDEL",
+    "segundoNombre": "DANIEL",
+    "razonSocial": null,
+    "nombreComercial": "TALLER INDUSTRIAL OTEROS",
+    "tipoContribuyente": "Persona natural o sucesión ilíquida",
+    "pais": "COLOMBIA",
+    "departamento": "Antioquia",
+    "ciudad": "Itagui",
+    "direccion": "CR   52       78   97",
+    "correoElectronico": "comercial@industriasoteros.com.co",
+    "telefono1": "6046006394",
+    "telefono2": "3122305066",
+    "actividadEconomicaPrincipal": null,
+    "actividadEconomicaSecundaria": null,
+    "responsabilidadesTributarias": ["49"],
+    "numeroFormulario": "141152791843",
+    "codigoDepartamento": "05",
+    "codigoPais": "169"
+  },
+  "certificadoBancario": {
+    "entidadBancaria": "BANCOLOMBIA",
+    "tipoCuenta": "1",
+    "numeroCuenta": "36593235038"
+  }
+}
+```
+
+> La extracción se delega a un servicio legacy configurado por `GESTION_CONTRATISTAS_URL`,
+> `LEGACY_EXTRACCION_PATH` y `LEGACY_API_TOKEN`. Si el legacy falla responde `502`.
+
+---
+
+### `POST /registro-contratistas/codigo-tercero-temporal`
+
+Sin body.
+
+**Response `200`**
+```json
+{
+  "codigoTercero": "TMP-3f9a2c1b"
+}
+```
+
+---
+
+### `POST /registro-contratistas/finalizar`
+
+**Body** — reenvía los datos extraídos más el `codigoTercero` obtenido en el paso previo.
+```json
+{
+  "rut": { "...": "objeto rut devuelto por /extraer" },
+  "certificadoBancario": { "...": "objeto certificadoBancario devuelto por /extraer" },
+  "codigoTercero": "TMP-3f9a2c1b"
+}
+```
+
+**Response `201`**
+```json
+{
+  "username": "brandel.otero",
+  "password": "string (texto plano, una sola vez)",
+  "usuario": {
+    "id": "bigint",
+    "nombre": "BRANDEL DANIEL OTERO ARANGO",
+    "email": "comercial@industriasoteros.com.co",
+    "codigoTercero": "TMP-3f9a2c1b",
+    "rol": "CONTRATISTA"
+  }
+}
+```
+
+- `username` se genera como `primernombre.primerapellido` (normalizado, con sufijo numérico si colisiona).
+- `password` es aleatoria y se devuelve en texto plano **una sola vez** para que el sistema invocante envíe el correo de bienvenida.
+- Responde `409` si ya existe un usuario con esa identificación o correo.
+
+---
+
 ## Módulo Contratos — `/contratos`
 
 | Método | Ruta | Roles | Descripción |
@@ -960,7 +1071,7 @@ Donde `{seccion}` es: `informe-actividades` | `planilla` | `retenciones` | `gast
 
 Sin body. Si la cuenta está en `APROBADA_SUPERVISOR`, pasa automáticamente a `EN_REVISION_APROBADOR`.
 
-Si al aprobar esta sección **todas** las secciones de la cuenta quedan en `APROBADO` (las secciones sin registros se ignoran), la cuenta pasa automáticamente a `LIQUIDADA` y la respuesta incluye `"cuentaLiquidada": true`.
+Esta acción no liquida la cuenta. Una vez todas las secciones estén en `APROBADO`, el aprobador debe llamar a `POST /aprobador/cuentas-cobro/:id/aprobar` para liquidar la cuenta.
 
 **Response `200`**
 ```json
@@ -1038,14 +1149,15 @@ Si la cuenta está en `APROBADA_SUPERVISOR`, pasa automáticamente a `EN_REVISIO
 | # | Módulo | Total endpoints |
 |---|---|---|
 | 1 | Auth | 4 |
-| 2 | Contratos | 1 |
-| 3 | Cuentas de Cobro | 5 |
-| 4 | Actividades | 4 |
-| 5 | Gastos | 4 |
-| 6 | Planilla | 2 |
-| 7 | Checklist Retefuente | 2 |
-| 8 | Supervisor | 13 |
-| 9 | Aprobador | 13 |
-| | **Total** | **48** |
+| 2 | Registro de Contratistas | 3 |
+| 3 | Contratos | 1 |
+| 4 | Cuentas de Cobro | 5 |
+| 5 | Actividades | 4 |
+| 6 | Gastos | 4 |
+| 7 | Planilla | 2 |
+| 8 | Checklist Retefuente | 2 |
+| 9 | Supervisor | 13 |
+| 10 | Aprobador | 13 |
+| | **Total** | **51** |
 
 > Los IDs numéricos grandes (`cuentaCobroId`, `actividadId`, `gastoId`, `adjuntoId`) son de tipo `BigInt`.

@@ -36,6 +36,15 @@ const usuarios = [
     userIdentification: '10000003',
     rol: 'APROBADOR' as const,
   },
+  {
+    username: 'admin',
+    password: 'admin',
+    nombre: 'Administrador',
+    email: 'admin@cuentascobro.dev',
+    codigoTercero: '0',
+    userIdentification: '10000004',
+    rol: 'ADMINISTRADOR' as const,
+  },
 ];
 
 const contratos = [
@@ -183,7 +192,18 @@ async function main() {
 
   console.log('\nEjecutando seed de cuentas de cobro...\n');
 
-  await prisma.cuentaCobro.deleteMany({ where: { codigoContrato: 39492 } });
+  const cleanupWhere = { codigoContrato: 39492 };
+  await prisma.$transaction([
+    prisma.adjunto.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
+    prisma.actividad.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
+    prisma.otroGasto.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
+    prisma.checklistRetefuente.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
+    prisma.planilla.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
+    prisma.ejecucionFisica.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
+    prisma.informeSupervision.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
+    prisma.historialEstado.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
+    prisma.cuentaCobro.deleteMany({ where: cleanupWhere }),
+  ]);
 
   for (const cc of cuentasCobro) {
     const created = await prisma.cuentaCobro.create({ data: cc });

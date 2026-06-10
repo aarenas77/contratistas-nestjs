@@ -40,6 +40,7 @@ export class SupervisorService {
       fechaFin: c.fechaFin,
       fechaSolicitud: c.fechaSolicitud?.toISOString() ?? null,
       valorCobrado: Number(c.valorCobrado),
+      codigoTerceroAprobador: c.codigoTerceroAprobador ? Number(c.codigoTerceroAprobador) : null,
     }));
 
     return {

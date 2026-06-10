@@ -2,9 +2,19 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AprobadorController } from './aprobador.controller';
 import { AprobadorService } from './aprobador.service';
 import { ListarCuentasAprobadorDto } from '../dto/listar-cuentas-aprobador.dto';
+import { Rol } from '../../auth/interfaces/jwt-payload.interface';
+import type { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
 
 const mockAprobadorService = {
   listarParaAprobacion: jest.fn(),
+};
+
+const mockUser: JwtPayload = {
+  sub: 'user-id-1',
+  nombre: 'Ana Aprobadora',
+  codigoTercero: 'APR001',
+  userIdentification: '87654321',
+  rol: Rol.APROBADOR,
 };
 
 describe('AprobadorController', () => {
@@ -35,9 +45,9 @@ describe('AprobadorController', () => {
       };
       mockAprobadorService.listarParaAprobacion.mockResolvedValue(expected);
 
-      const result = await controller.listarParaAprobacion(dto);
+      const result = await controller.listarParaAprobacion(mockUser, dto);
 
-      expect(mockAprobadorService.listarParaAprobacion).toHaveBeenCalledWith(dto);
+      expect(mockAprobadorService.listarParaAprobacion).toHaveBeenCalledWith(mockUser.codigoTercero, dto);
       expect(result).toBe(expected);
     });
 
@@ -45,9 +55,9 @@ describe('AprobadorController', () => {
       const dto: ListarCuentasAprobadorDto = { codigoContrato: 39492, page: 0, size: 5 };
       mockAprobadorService.listarParaAprobacion.mockResolvedValue({ success: true, data: [] });
 
-      await controller.listarParaAprobacion(dto);
+      await controller.listarParaAprobacion(mockUser, dto);
 
-      expect(mockAprobadorService.listarParaAprobacion).toHaveBeenCalledWith(dto);
+      expect(mockAprobadorService.listarParaAprobacion).toHaveBeenCalledWith(mockUser.codigoTercero, dto);
     });
   });
 });

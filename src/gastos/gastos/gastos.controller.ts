@@ -30,7 +30,7 @@ export class GastosController {
 
   // IMPORTANTE: esta ruta va PRIMERO para evitar colisión con :cuentaCobroId
   @Get('adjunto/:adjuntoId')
-  @Roles(Rol.CONTRATISTA, Rol.SUPERVISOR)
+  @Roles(Rol.CONTRATISTA, Rol.SUPERVISOR, Rol.APROBADOR)
   @ApiOperation({ summary: 'Descargar evidencia de un gasto' })
   async getAdjunto(
     @Param('adjuntoId') adjuntoId: string,
@@ -47,7 +47,7 @@ export class GastosController {
   }
 
   @Get(':cuentaCobroId')
-  @Roles(Rol.CONTRATISTA, Rol.SUPERVISOR)
+  @Roles(Rol.CONTRATISTA, Rol.SUPERVISOR, Rol.APROBADOR)
   @ApiOperation({ summary: 'Listar gastos adicionales de una cuenta de cobro' })
   listar(@Param('cuentaCobroId') id: string, @CurrentUser() user: JwtPayload) {
     return this.service.listar(BigInt(id), user.codigoTercero, user.rol);
