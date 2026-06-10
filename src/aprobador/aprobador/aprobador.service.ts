@@ -72,21 +72,26 @@ export class AprobadorService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      const todasAprobadas = await this.verificarTodasSeccionesAprobadas(tx, id);
+      if (!todasAprobadas) {
+        throw new BadRequestException('No se puede liquidar la cuenta: hay secciones que aún no están aprobadas');
+      }
+
       const actualizada = await tx.cuentaCobro.update({
         where: { id },
-        data: { estado: 'APROBADA_FINAL' },
+        data: { estado: 'LIQUIDADA' },
       });
       await tx.historialEstado.create({
         data: {
           cuentaCobroId: id,
           estadoAnterior: 'EN_REVISION_APROBADOR',
-          estadoNuevo: 'APROBADA_FINAL',
+          estadoNuevo: 'LIQUIDADA',
           usuarioId: codigoTercero,
           usuarioNombre,
-          observacion: 'Cuenta de cobro aprobada definitivamente por el aprobador',
+          observacion: 'Cuenta de cobro liquidada por el aprobador',
         },
       });
-      return { ...actualizada, mensaje: 'Cuenta de cobro aprobada definitivamente' };
+      return { ...actualizada, mensaje: 'Cuenta de cobro liquidada' };
     });
   }
 

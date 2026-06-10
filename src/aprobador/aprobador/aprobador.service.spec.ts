@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AprobadorService } from './aprobador.service';
 import { PrismaService } from '../../prisma/prisma/prisma.service';
@@ -357,6 +358,65 @@ describe('AprobadorService', () => {
         estado: 'APROBADO',
         cuentaLiquidada: true,
       });
+    });
+  });
+
+  describe('aprobar', () => {
+    const id = BigInt(20);
+    const codigoTercero = 'APR001';
+    const usuarioNombre = 'Ana Aprobadora';
+
+    const cuentaEnRevision = {
+      id,
+      codigoTerceroAprobador: codigoTercero,
+      estado: 'EN_REVISION_APROBADOR',
+    };
+
+    function buildTx(overrides: Record<string, any> = {}) {
+      return {
+        actividad: { count: jest.fn().mockResolvedValue(0) },
+        planilla: { findUnique: jest.fn().mockResolvedValue(null) },
+        checklistRetefuente: { count: jest.fn().mockResolvedValue(0) },
+        otroGasto: { count: jest.fn().mockResolvedValue(0) },
+        ejecucionFisica: { findUnique: jest.fn().mockResolvedValue(null) },
+        cuentaCobro: { update: jest.fn().mockResolvedValue({ ...cuentaEnRevision, estado: 'LIQUIDADA' }) },
+        historialEstado: { create: jest.fn().mockResolvedValue({}) },
+        ...overrides,
+      };
+    }
+
+    it('lanza BadRequestException si quedan secciones sin aprobar', async () => {
+      mockPrismaService.cuentaCobro.findUniqueOrThrow.mockResolvedValue(cuentaEnRevision);
+      const tx = buildTx({ actividad: { count: jest.fn().mockResolvedValue(1) } });
+      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(tx));
+
+      await expect(service.aprobar(id, codigoTercero, usuarioNombre)).rejects.toThrow(BadRequestException);
+      expect(tx.cuentaCobro.update).not.toHaveBeenCalled();
+    });
+
+    it('cambia el estado a LIQUIDADA cuando todas las secciones están aprobadas', async () => {
+      mockPrismaService.cuentaCobro.findUniqueOrThrow.mockResolvedValue(cuentaEnRevision);
+      const tx = buildTx();
+      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(tx));
+
+      const result = await service.aprobar(id, codigoTercero, usuarioNombre);
+
+      expect(tx.cuentaCobro.update).toHaveBeenCalledWith({
+        where: { id },
+        data: { estado: 'LIQUIDADA' },
+      });
+      expect(tx.historialEstado.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          cuentaCobroId: id,
+          estadoAnterior: 'EN_REVISION_APROBADOR',
+          estadoNuevo: 'LIQUIDADA',
+          usuarioId: codigoTercero,
+          usuarioNombre,
+          observacion: 'Cuenta de cobro liquidada por el aprobador',
+        }),
+      });
+      expect(result.estado).toBe('LIQUIDADA');
+      expect(result.mensaje).toBe('Cuenta de cobro liquidada');
     });
   });
 });
