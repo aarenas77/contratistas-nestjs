@@ -924,7 +924,7 @@ Sin body. La cuenta debe estar en estado `EN_REVISION_APROBADOR` y todas sus sec
   "ticket": 1,
   "estado": "LIQUIDADA",
   "updatedAt": "ISO datetime",
-  "mensaje": "Cuenta de cobro aprobada definitivamente"
+  "mensaje": "Cuenta de cobro liquidada"
 }
 ```
 
