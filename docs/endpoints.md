@@ -22,7 +22,7 @@
 ```
 BORRADOR | RADICADA | EN_REVISION_SUPERVISOR | DEVUELTA_CONTRATISTA
 APROBADA_SUPERVISOR | EN_REVISION_APROBADOR | RECHAZADA_APROBADOR
-APROBADA_FINAL | ENVIADA_CONTABILIDAD
+LIQUIDADA | ENVIADA_CONTABILIDAD
 ```
 
 **`EstadoSeccion`**
@@ -409,8 +409,8 @@ Sin body.
 | Método | Ruta | Roles | Descripción |
 |---|---|---|---|
 | `POST` | `/actividades/:cuentaCobroId` | `CONTRATISTA` | Agrega actividad con adjunto (`multipart/form-data`) |
-| `GET` | `/actividades/:cuentaCobroId` | `CONTRATISTA` | Lista actividades de la cuenta |
-| `GET` | `/actividades/adjunto/:adjuntoId` | `CONTRATISTA` | Descarga el adjunto de una actividad |
+| `GET` | `/actividades/:cuentaCobroId` | `CONTRATISTA`, `SUPERVISOR`, `APROBADOR` | Lista actividades de la cuenta |
+| `GET` | `/actividades/adjunto/:adjuntoId` | `CONTRATISTA`, `SUPERVISOR`, `APROBADOR` | Descarga el adjunto de una actividad |
 | `DELETE` | `/actividades/:actividadId` | `CONTRATISTA` | Elimina actividad y su adjunto |
 
 ---
@@ -504,8 +504,8 @@ Sin body.
 | Método | Ruta | Roles | Descripción |
 |---|---|---|---|
 | `POST` | `/gastos/:cuentaCobroId` | `CONTRATISTA` | Agrega gasto con evidencia (`multipart/form-data`) |
-| `GET` | `/gastos/:cuentaCobroId` | `CONTRATISTA` | Lista gastos de la cuenta |
-| `GET` | `/gastos/adjunto/:adjuntoId` | `CONTRATISTA` | Descarga la evidencia de un gasto |
+| `GET` | `/gastos/:cuentaCobroId` | `CONTRATISTA`, `SUPERVISOR`, `APROBADOR` | Lista gastos de la cuenta |
+| `GET` | `/gastos/adjunto/:adjuntoId` | `CONTRATISTA`, `SUPERVISOR`, `APROBADOR` | Descarga la evidencia de un gasto |
 | `DELETE` | `/gastos/:gastoId` | `CONTRATISTA` | Elimina gasto y su evidencia |
 
 ---
@@ -600,7 +600,7 @@ Sin body.
 
 | Método | Ruta | Roles | Descripción |
 |---|---|---|---|
-| `GET` | `/planilla/:cuentaCobroId` | `CONTRATISTA`, `SUPERVISOR` | Obtiene la planilla de seguridad social |
+| `GET` | `/planilla/:cuentaCobroId` | `CONTRATISTA`, `SUPERVISOR`, `APROBADOR` | Obtiene la planilla de seguridad social |
 | `PUT` | `/planilla/:cuentaCobroId` | `CONTRATISTA` | Crea o actualiza la planilla (upsert) |
 
 ---
@@ -658,7 +658,7 @@ Sin body.
 
 | Método | Ruta | Roles | Descripción |
 |---|---|---|---|
-| `GET` | `/checklist-retefuente/:cuentaCobroId` | `CONTRATISTA`, `SUPERVISOR` | Obtiene el checklist (se auto-inicializa si no existe) |
+| `GET` | `/checklist-retefuente/:cuentaCobroId` | `CONTRATISTA`, `SUPERVISOR`, `APROBADOR` | Obtiene el checklist (se auto-inicializa si no existe) |
 | `PATCH` | `/checklist-retefuente/:cuentaCobroId` | `CONTRATISTA` | Actualiza respuestas del checklist en bloque |
 
 ---
@@ -854,7 +854,19 @@ Donde `{seccion}` es: `informe-actividades` | `planilla` | `retenciones` | `gast
 
 | Método | Ruta | Roles | Descripción |
 |---|---|---|---|
-| `GET` | `/aprobador/cuentas-cobro` | `APROBADOR` | Lista cuentas aprobadas por supervisor |
+| `GET` | `/aprobador/cuentas-cobro` | `APROBADOR` | Lista cuentas en estado APROBADA_SUPERVISOR o EN_REVISION_APROBADOR asignadas al aprobador |
+| `POST` | `/aprobador/cuentas-cobro/:id/aprobar` | `APROBADOR` | Liquida la cuenta si todas las secciones están aprobadas (→ LIQUIDADA) |
+| `POST` | `/aprobador/cuentas-cobro/:id/rechazar` | `APROBADOR` | Rechaza la cuenta (→ RECHAZADA_APROBADOR) |
+| `POST` | `/aprobador/cuentas-cobro/:id/secciones/informe-actividades/aprobar` | `APROBADOR` | Aprueba la sección de actividades |
+| `POST` | `/aprobador/cuentas-cobro/:id/secciones/informe-actividades/rechazar` | `APROBADOR` | Rechaza la sección de actividades |
+| `POST` | `/aprobador/cuentas-cobro/:id/secciones/planilla/aprobar` | `APROBADOR` | Aprueba la sección de planilla |
+| `POST` | `/aprobador/cuentas-cobro/:id/secciones/planilla/rechazar` | `APROBADOR` | Rechaza la sección de planilla |
+| `POST` | `/aprobador/cuentas-cobro/:id/secciones/retenciones/aprobar` | `APROBADOR` | Aprueba la sección de retenciones |
+| `POST` | `/aprobador/cuentas-cobro/:id/secciones/retenciones/rechazar` | `APROBADOR` | Rechaza la sección de retenciones |
+| `POST` | `/aprobador/cuentas-cobro/:id/secciones/gastos-adicionales/aprobar` | `APROBADOR` | Aprueba la sección de gastos adicionales |
+| `POST` | `/aprobador/cuentas-cobro/:id/secciones/gastos-adicionales/rechazar` | `APROBADOR` | Rechaza la sección de gastos adicionales |
+| `POST` | `/aprobador/cuentas-cobro/:id/secciones/ejecucion-fisica/aprobar` | `APROBADOR` | Aprueba la sección de ejecución física |
+| `POST` | `/aprobador/cuentas-cobro/:id/secciones/ejecucion-fisica/rechazar` | `APROBADOR` | Rechaza la sección de ejecución física |
 
 ---
 
@@ -881,7 +893,7 @@ size?: number            (default: 10, min: 1)
       "codigoContrato": 39492,
       "codigoTercero": "string",
       "codigoTerceroSupervisor": "string",
-      "estado": "APROBADA_SUPERVISOR",
+      "estado": "APROBADA_SUPERVISOR | EN_REVISION_APROBADOR",
       "fechaInicio": "ISO datetime",
       "fechaFin": "ISO datetime",
       "fechaSolicitud": "string | null",
@@ -896,6 +908,91 @@ size?: number            (default: 10, min: 1)
   "primera": true,
   "ultima": true,
   "timestamp": "ISO datetime"
+}
+```
+
+---
+
+### `POST /aprobador/cuentas-cobro/:id/aprobar`
+
+Sin body. La cuenta debe estar en estado `EN_REVISION_APROBADOR` y todas sus secciones (informe de actividades, planilla, retenciones, gastos adicionales, ejecución física) deben estar en estado `APROBADO` (las secciones sin registros se ignoran). Si alguna sección no está aprobada, retorna `400 Bad Request`.
+
+**Response `200`**
+```json
+{
+  "id": "bigint",
+  "ticket": 1,
+  "estado": "LIQUIDADA",
+  "updatedAt": "ISO datetime",
+  "mensaje": "Cuenta de cobro aprobada definitivamente"
+}
+```
+
+---
+
+### `POST /aprobador/cuentas-cobro/:id/rechazar`
+
+La cuenta debe estar en estado `APROBADA_SUPERVISOR` o `EN_REVISION_APROBADOR`.
+
+**Body**
+```json
+{
+  "observacion": "string (max 1000 chars)"
+}
+```
+
+**Response `200`**
+```json
+{
+  "id": "bigint",
+  "ticket": 1,
+  "estado": "RECHAZADA_APROBADOR",
+  "updatedAt": "ISO datetime",
+  "mensaje": "Cuenta de cobro rechazada por el aprobador"
+}
+```
+
+---
+
+### `POST /aprobador/cuentas-cobro/:id/secciones/{seccion}/aprobar`
+
+Donde `{seccion}` es: `informe-actividades` | `planilla` | `retenciones` | `gastos-adicionales` | `ejecucion-fisica`
+
+Sin body. Si la cuenta está en `APROBADA_SUPERVISOR`, pasa automáticamente a `EN_REVISION_APROBADOR`.
+
+Si al aprobar esta sección **todas** las secciones de la cuenta quedan en `APROBADO` (las secciones sin registros se ignoran), la cuenta pasa automáticamente a `LIQUIDADA` y la respuesta incluye `"cuentaLiquidada": true`.
+
+**Response `200`**
+```json
+{
+  "mensaje": "string",
+  "seccion": "INFORME_ACTIVIDADES | PLANILLA | RETENCIONES | GASTOS_ADICIONALES | EJECUCION_FISICA",
+  "estado": "APROBADO"
+}
+```
+
+---
+
+### `POST /aprobador/cuentas-cobro/:id/secciones/{seccion}/rechazar`
+
+Donde `{seccion}` es: `informe-actividades` | `planilla` | `retenciones` | `gastos-adicionales` | `ejecucion-fisica`
+
+Si la cuenta está en `APROBADA_SUPERVISOR`, pasa automáticamente a `EN_REVISION_APROBADOR`.
+
+**Body**
+```json
+{
+  "justificacion": "string (max 1000 chars)"
+}
+```
+
+**Response `200`**
+```json
+{
+  "mensaje": "string",
+  "seccion": "INFORME_ACTIVIDADES | PLANILLA | RETENCIONES | GASTOS_ADICIONALES | EJECUCION_FISICA",
+  "estado": "RECHAZADO",
+  "justificacion": "string"
 }
 ```
 
@@ -926,7 +1023,12 @@ size?: number            (default: 10, min: 1)
                    ó
                 →  POST /supervisor/cuentas-cobro/:id/rechazar  (cuenta → DEVUELTA_CONTRATISTA)
 
-5. APROBADOR    →  GET  /aprobador/cuentas-cobro                (lista cuentas aprobadas por supervisor)
+5. APROBADOR    →  GET  /aprobador/cuentas-cobro                (lista cuentas pendientes de aprobación)
+                →  GET  /cuentas-cobro/:id                      (revisa detalle completo)
+                →  POST /aprobador/cuentas-cobro/:id/secciones/{seccion}/aprobar|rechazar
+                →  POST /aprobador/cuentas-cobro/:id/aprobar    (cuenta → LIQUIDADA, requiere todas las secciones aprobadas)
+                   ó
+                →  POST /aprobador/cuentas-cobro/:id/rechazar   (cuenta → RECHAZADA_APROBADOR)
 ```
 
 ---
@@ -943,7 +1045,7 @@ size?: number            (default: 10, min: 1)
 | 6 | Planilla | 2 |
 | 7 | Checklist Retefuente | 2 |
 | 8 | Supervisor | 13 |
-| 9 | Aprobador | 1 |
-| | **Total** | **36** |
+| 9 | Aprobador | 13 |
+| | **Total** | **48** |
 
 > Los IDs numéricos grandes (`cuentaCobroId`, `actividadId`, `gastoId`, `adjuntoId`) son de tipo `BigInt`.
