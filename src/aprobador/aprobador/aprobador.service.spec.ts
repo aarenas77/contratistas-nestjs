@@ -236,4 +236,79 @@ describe('AprobadorService', () => {
       });
     });
   });
+
+  describe('aprobarSeccionPlanilla', () => {
+    const id = BigInt(11);
+    const codigoTercero = 'APR001';
+    const usuarioNombre = 'Ana Aprobadora';
+
+    const cuentaEnRevision = {
+      id,
+      codigoTerceroAprobador: codigoTercero,
+      estado: 'EN_REVISION_APROBADOR',
+    };
+
+    function buildTx(overrides: Record<string, any> = {}) {
+      return {
+        actividad: { count: jest.fn().mockResolvedValue(0) },
+        planilla: {
+          findUnique: jest.fn().mockResolvedValue({ estadoRevisionAprobador: 'APROBADO' }),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        checklistRetefuente: { count: jest.fn().mockResolvedValue(0) },
+        otroGasto: { count: jest.fn().mockResolvedValue(0) },
+        ejecucionFisica: { findUnique: jest.fn().mockResolvedValue(null) },
+        cuentaCobro: { update: jest.fn().mockResolvedValue({ ...cuentaEnRevision, estado: 'LIQUIDADA' }) },
+        historialEstado: { create: jest.fn().mockResolvedValue({}) },
+        ...overrides,
+      };
+    }
+
+    beforeEach(() => {
+      mockPrismaService.cuentaCobro.findUniqueOrThrow.mockResolvedValue(cuentaEnRevision);
+    });
+
+    it('aprueba la sección y liquida la cuenta cuando es la última sección pendiente', async () => {
+      (mockPrismaService as any).planilla = { findUnique: jest.fn().mockResolvedValue({ id: BigInt(1) }) };
+      const tx = buildTx();
+      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(tx));
+
+      const result = await service.aprobarSeccionPlanilla(id, codigoTercero, usuarioNombre);
+
+      expect(tx.planilla.update).toHaveBeenCalledWith({
+        where: { cuentaCobroId: id },
+        data: { estadoRevisionAprobador: 'APROBADO', observacionRevisionAprobador: null },
+      });
+      expect(tx.cuentaCobro.update).toHaveBeenCalledWith({
+        where: { id },
+        data: { estado: 'LIQUIDADA' },
+      });
+      expect(result).toMatchObject({
+        mensaje: 'Pago de planilla aprobado por el aprobador',
+        seccion: 'PLANILLA',
+        estado: 'APROBADO',
+        cuentaLiquidada: true,
+      });
+    });
+
+    it('no liquida si la planilla recién aprobada todavía no refleja APROBADO en la verificación', async () => {
+      (mockPrismaService as any).planilla = { findUnique: jest.fn().mockResolvedValue({ id: BigInt(1) }) };
+      const tx = buildTx({
+        planilla: {
+          findUnique: jest.fn().mockResolvedValue({ estadoRevisionAprobador: 'PENDIENTE' }),
+          update: jest.fn().mockResolvedValue({}),
+        },
+      });
+      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(tx));
+
+      const result = await service.aprobarSeccionPlanilla(id, codigoTercero, usuarioNombre);
+
+      expect(tx.cuentaCobro.update).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        seccion: 'PLANILLA',
+        estado: 'APROBADO',
+        cuentaLiquidada: false,
+      });
+    });
+  });
 });

@@ -239,7 +239,8 @@ export class AprobadorService {
         where: { cuentaCobroId: id },
         data: { estadoRevisionAprobador: 'APROBADO', observacionRevisionAprobador: null },
       });
-      return { mensaje: 'Pago de planilla aprobado por el aprobador', seccion: 'PLANILLA', estado: 'APROBADO' };
+      const cuentaLiquidada = await this.liquidarSiCorresponde(tx, id, codigoTercero, usuarioNombre);
+      return { mensaje: 'Pago de planilla aprobado por el aprobador', seccion: 'PLANILLA', estado: 'APROBADO', cuentaLiquidada };
     });
   }
 
