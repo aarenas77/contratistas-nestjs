@@ -12,7 +12,7 @@ const ESTADO_LEGACY: Record<EstadoCuentaCobro, { idEstado: number; estado: strin
   APROBADA_SUPERVISOR:    { idEstado: 4, estado: 'APROBADA_SUPERVISOR' },
   EN_REVISION_APROBADOR:  { idEstado: 5, estado: 'EN_REVISION_APROBADOR' },
   RECHAZADA_APROBADOR:    { idEstado: 6, estado: 'RECHAZADA' },
-  APROBADA_FINAL:         { idEstado: 7, estado: 'APROBADA' },
+  LIQUIDADA:              { idEstado: 7, estado: 'APROBADA' },
   ENVIADA_CONTABILIDAD:   { idEstado: 8, estado: 'ENVIADA_CONTABILIDAD' },
 };
 
