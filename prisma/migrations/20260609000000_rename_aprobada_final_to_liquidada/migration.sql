@@ -1,0 +1,2 @@
+-- RenameEnumValue
+ALTER TYPE "EstadoCuentaCobro" RENAME VALUE 'APROBADA_FINAL' TO 'LIQUIDADA';
