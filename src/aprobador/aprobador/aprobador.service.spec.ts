@@ -33,7 +33,7 @@ describe('AprobadorService', () => {
   describe('listarParaAprobacion', () => {
     const dto = { page: 0, size: 10 };
 
-    it('filtra por estado APROBADA_SUPERVISOR', async () => {
+    it('filtra por estados APROBADA_SUPERVISOR y EN_REVISION_APROBADOR', async () => {
       mockPrismaService.cuentaCobro.findMany.mockResolvedValue([]);
       mockPrismaService.cuentaCobro.count.mockResolvedValue(0);
 
@@ -41,7 +41,9 @@ describe('AprobadorService', () => {
 
       expect(mockPrismaService.cuentaCobro.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ estado: 'APROBADA_SUPERVISOR' }),
+          where: expect.objectContaining({
+            estado: { in: ['APROBADA_SUPERVISOR', 'EN_REVISION_APROBADOR'] },
+          }),
         }),
       );
     });
