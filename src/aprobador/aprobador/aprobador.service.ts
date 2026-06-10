@@ -271,7 +271,8 @@ export class AprobadorService {
       if (result.count === 0) {
         throw new BadRequestException('No hay ítems de retenciones registrados en esta cuenta');
       }
-      return { mensaje: 'Retenciones aprobadas por el aprobador', seccion: 'RETENCIONES', estado: 'APROBADO' };
+      const cuentaLiquidada = await this.liquidarSiCorresponde(tx, id, codigoTercero, usuarioNombre);
+      return { mensaje: 'Retenciones aprobadas por el aprobador', seccion: 'RETENCIONES', estado: 'APROBADO', cuentaLiquidada };
     });
   }
 
@@ -301,7 +302,8 @@ export class AprobadorService {
       if (result.count === 0) {
         throw new BadRequestException('No hay gastos adicionales registrados en esta cuenta');
       }
-      return { mensaje: 'Gastos adicionales aprobados por el aprobador', seccion: 'GASTOS_ADICIONALES', estado: 'APROBADO' };
+      const cuentaLiquidada = await this.liquidarSiCorresponde(tx, id, codigoTercero, usuarioNombre);
+      return { mensaje: 'Gastos adicionales aprobados por el aprobador', seccion: 'GASTOS_ADICIONALES', estado: 'APROBADO', cuentaLiquidada };
     });
   }
 
@@ -332,7 +334,8 @@ export class AprobadorService {
         where: { cuentaCobroId: id },
         data: { estadoRevisionAprobador: 'APROBADO', observacionRevisionAprobador: null },
       });
-      return { mensaje: 'Ejecución física aprobada por el aprobador', seccion: 'EJECUCION_FISICA', estado: 'APROBADO' };
+      const cuentaLiquidada = await this.liquidarSiCorresponde(tx, id, codigoTercero, usuarioNombre);
+      return { mensaje: 'Ejecución física aprobada por el aprobador', seccion: 'EJECUCION_FISICA', estado: 'APROBADO', cuentaLiquidada };
     });
   }
 

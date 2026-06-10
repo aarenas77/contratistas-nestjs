@@ -311,4 +311,52 @@ describe('AprobadorService', () => {
       });
     });
   });
+
+  describe('aprobarSeccionEjecucionFisica', () => {
+    const id = BigInt(12);
+    const codigoTercero = 'APR001';
+    const usuarioNombre = 'Ana Aprobadora';
+
+    const cuentaEnRevision = {
+      id,
+      codigoTerceroAprobador: codigoTercero,
+      estado: 'EN_REVISION_APROBADOR',
+    };
+
+    it('aprueba la sección y liquida la cuenta cuando es la última sección pendiente', async () => {
+      mockPrismaService.cuentaCobro.findUniqueOrThrow.mockResolvedValue(cuentaEnRevision);
+      (mockPrismaService as any).ejecucionFisica = { findUnique: jest.fn().mockResolvedValue({ id: BigInt(1) }) };
+
+      const tx = {
+        actividad: { count: jest.fn().mockResolvedValue(0) },
+        planilla: { findUnique: jest.fn().mockResolvedValue(null) },
+        checklistRetefuente: { count: jest.fn().mockResolvedValue(0) },
+        otroGasto: { count: jest.fn().mockResolvedValue(0) },
+        ejecucionFisica: {
+          findUnique: jest.fn().mockResolvedValue({ estadoRevisionAprobador: 'APROBADO' }),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        cuentaCobro: { update: jest.fn().mockResolvedValue({ ...cuentaEnRevision, estado: 'LIQUIDADA' }) },
+        historialEstado: { create: jest.fn().mockResolvedValue({}) },
+      };
+      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(tx));
+
+      const result = await service.aprobarSeccionEjecucionFisica(id, codigoTercero, usuarioNombre);
+
+      expect(tx.ejecucionFisica.update).toHaveBeenCalledWith({
+        where: { cuentaCobroId: id },
+        data: { estadoRevisionAprobador: 'APROBADO', observacionRevisionAprobador: null },
+      });
+      expect(tx.cuentaCobro.update).toHaveBeenCalledWith({
+        where: { id },
+        data: { estado: 'LIQUIDADA' },
+      });
+      expect(result).toMatchObject({
+        mensaje: 'Ejecución física aprobada por el aprobador',
+        seccion: 'EJECUCION_FISICA',
+        estado: 'APROBADO',
+        cuentaLiquidada: true,
+      });
+    });
+  });
 });
