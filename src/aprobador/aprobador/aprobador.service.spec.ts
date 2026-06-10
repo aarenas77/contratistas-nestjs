@@ -6,7 +6,9 @@ const mockPrismaService = {
   cuentaCobro: {
     findMany: jest.fn(),
     count: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
   },
+  $transaction: jest.fn(),
 };
 
 describe('AprobadorService', () => {
@@ -35,7 +37,7 @@ describe('AprobadorService', () => {
       mockPrismaService.cuentaCobro.findMany.mockResolvedValue([]);
       mockPrismaService.cuentaCobro.count.mockResolvedValue(0);
 
-      await service.listarParaAprobacion(dto);
+      await service.listarParaAprobacion('APR001', dto);
 
       expect(mockPrismaService.cuentaCobro.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -48,7 +50,7 @@ describe('AprobadorService', () => {
       mockPrismaService.cuentaCobro.findMany.mockResolvedValue([]);
       mockPrismaService.cuentaCobro.count.mockResolvedValue(0);
 
-      await service.listarParaAprobacion({ ...dto, codigoContrato: 39492 });
+      await service.listarParaAprobacion('APR001', { ...dto, codigoContrato: 39492 });
 
       expect(mockPrismaService.cuentaCobro.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -61,7 +63,7 @@ describe('AprobadorService', () => {
       mockPrismaService.cuentaCobro.findMany.mockResolvedValue([]);
       mockPrismaService.cuentaCobro.count.mockResolvedValue(0);
 
-      await service.listarParaAprobacion({});
+      await service.listarParaAprobacion('APR001', {});
 
       expect(mockPrismaService.cuentaCobro.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ skip: 0, take: 10 }),
@@ -72,7 +74,7 @@ describe('AprobadorService', () => {
       mockPrismaService.cuentaCobro.findMany.mockResolvedValue([]);
       mockPrismaService.cuentaCobro.count.mockResolvedValue(0);
 
-      await service.listarParaAprobacion({ page: 1, size: 5 });
+      await service.listarParaAprobacion('APR001', { page: 1, size: 5 });
 
       expect(mockPrismaService.cuentaCobro.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ skip: 5, take: 5 }),
@@ -97,7 +99,7 @@ describe('AprobadorService', () => {
       mockPrismaService.cuentaCobro.findMany.mockResolvedValue([cuentaMock]);
       mockPrismaService.cuentaCobro.count.mockResolvedValue(1);
 
-      const result = await service.listarParaAprobacion(dto);
+      const result = await service.listarParaAprobacion('APR001', dto);
 
       expect(result.success).toBe(true);
       expect(result.totalElementos).toBe(1);
@@ -135,7 +137,7 @@ describe('AprobadorService', () => {
       mockPrismaService.cuentaCobro.findMany.mockResolvedValue([cuentaMock]);
       mockPrismaService.cuentaCobro.count.mockResolvedValue(1);
 
-      const result = await service.listarParaAprobacion(dto);
+      const result = await service.listarParaAprobacion('APR001', dto);
 
       expect(result.data[0].idPago).toBe(999);
       expect(typeof result.data[0].idPago).toBe('number');
@@ -145,7 +147,7 @@ describe('AprobadorService', () => {
       mockPrismaService.cuentaCobro.findMany.mockResolvedValue([]);
       mockPrismaService.cuentaCobro.count.mockResolvedValue(15);
 
-      const result = await service.listarParaAprobacion({ page: 1, size: 10 });
+      const result = await service.listarParaAprobacion('APR001', { page: 1, size: 10 });
 
       expect(result.primera).toBe(false);
     });
@@ -154,9 +156,82 @@ describe('AprobadorService', () => {
       mockPrismaService.cuentaCobro.findMany.mockResolvedValue([]);
       mockPrismaService.cuentaCobro.count.mockResolvedValue(7);
 
-      const result = await service.listarParaAprobacion(dto);
+      const result = await service.listarParaAprobacion('APR001', dto);
 
       expect(result.message).toContain('7');
+    });
+  });
+
+  describe('aprobarSeccionInformeActividades', () => {
+    const id = BigInt(10);
+    const codigoTercero = 'APR001';
+    const usuarioNombre = 'Ana Aprobadora';
+
+    const cuentaEnRevision = {
+      id,
+      codigoTerceroAprobador: codigoTercero,
+      estado: 'EN_REVISION_APROBADOR',
+    };
+
+    function buildTx(overrides: Record<string, any> = {}) {
+      return {
+        actividad: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          count: jest.fn().mockResolvedValue(0),
+        },
+        planilla: { findUnique: jest.fn().mockResolvedValue(null) },
+        checklistRetefuente: { count: jest.fn().mockResolvedValue(0) },
+        otroGasto: { count: jest.fn().mockResolvedValue(0) },
+        ejecucionFisica: { findUnique: jest.fn().mockResolvedValue(null) },
+        cuentaCobro: { update: jest.fn().mockResolvedValue({ ...cuentaEnRevision, estado: 'LIQUIDADA' }) },
+        historialEstado: { create: jest.fn().mockResolvedValue({}) },
+        ...overrides,
+      };
+    }
+
+    it('aprueba la sección y liquida la cuenta cuando es la única sección con datos', async () => {
+      mockPrismaService.cuentaCobro.findUniqueOrThrow.mockResolvedValue(cuentaEnRevision);
+      const tx = buildTx();
+      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(tx));
+
+      const result = await service.aprobarSeccionInformeActividades(id, codigoTercero, usuarioNombre);
+
+      expect(tx.cuentaCobro.update).toHaveBeenCalledWith({
+        where: { id },
+        data: { estado: 'LIQUIDADA' },
+      });
+      expect(tx.historialEstado.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          cuentaCobroId: id,
+          estadoAnterior: 'EN_REVISION_APROBADOR',
+          estadoNuevo: 'LIQUIDADA',
+          usuarioId: codigoTercero,
+          usuarioNombre,
+        }),
+      });
+      expect(result).toMatchObject({
+        mensaje: 'Informe de actividades aprobado por el aprobador',
+        seccion: 'INFORME_ACTIVIDADES',
+        estado: 'APROBADO',
+        cuentaLiquidada: true,
+      });
+    });
+
+    it('aprueba la sección sin liquidar si quedan secciones pendientes', async () => {
+      mockPrismaService.cuentaCobro.findUniqueOrThrow.mockResolvedValue(cuentaEnRevision);
+      const tx = buildTx({
+        checklistRetefuente: { count: jest.fn().mockResolvedValue(2) },
+      });
+      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(tx));
+
+      const result = await service.aprobarSeccionInformeActividades(id, codigoTercero, usuarioNombre);
+
+      expect(tx.cuentaCobro.update).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        seccion: 'INFORME_ACTIVIDADES',
+        estado: 'APROBADO',
+        cuentaLiquidada: false,
+      });
     });
   });
 });
