@@ -1,18 +1,27 @@
-import { ConflictException, Injectable } from '@nestjs/common';
-import { randomBytes, randomInt } from 'crypto';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import { randomInt } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma/prisma.service';
-import { ExtraccionLegacyService } from '../extraccion/extraccion-legacy.service';
+import { ExtraccionService } from '../extraccion/extraccion.service';
 import { DatosExtraidosDto } from '../dto/datos-extraidos.dto';
 import { FinalizarRegistroDto } from '../dto/finalizar-registro.dto';
 import { RutExtraidoDto } from '../dto/rut-extraido.dto';
 import { Rol } from '../../auth/interfaces/jwt-payload.interface';
+import { PRESUPUESTO_GATEWAY } from '../../presupuesto/presupuesto.gateway';
+import type { PresupuestoGateway } from '../../presupuesto/presupuesto.gateway';
 
 @Injectable()
 export class RegistroContratistasService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly extraccion: ExtraccionLegacyService,
+    private readonly extraccion: ExtraccionService,
+    @Inject(PRESUPUESTO_GATEWAY)
+    private readonly presupuesto: PresupuestoGateway,
   ) {}
 
   /** Paso 1: extrae la información del RUT y la certificación bancaria. */
@@ -23,27 +32,21 @@ export class RegistroContratistasService {
     return this.extraccion.extraer(rut, certificado);
   }
 
-  /**
-   * Genera un codigoTercero TEMPORAL único. Es un placeholder hasta que exista
-   * la integración con el sistema de precarga real, que asignará el código
-   * definitivo asociado a los contratos del contratista.
-   */
-  async generarCodigoTerceroTemporal(): Promise<string> {
-    // Reintenta ante una colisión improbable con un código ya existente.
-    for (let intento = 0; intento < 5; intento++) {
-      const codigo = `TMP-${randomBytes(4).toString('hex')}`;
-      const existe = await this.prisma.usuario.findFirst({
-        where: { codigoTercero: codigo },
-        select: { id: true },
-      });
-      if (!existe) return codigo;
-    }
-    throw new ConflictException('No se pudo generar un código de tercero único, intenta de nuevo.');
-  }
-
   /** Paso final: crea el usuario contratista y devuelve sus credenciales. */
   async finalizar(dto: FinalizarRegistroDto) {
     const { rut } = dto;
+
+    // El codigoTercero lo resuelve presupuesto a partir de la identificación del
+    // RUT; nunca llega desde el cliente. Si el contratista no está precargado,
+    // no hay nada que registrar.
+    const tercero = await this.presupuesto.obtenerTerceroPorIdentificacion(
+      rut.numeroIdentificacion,
+    );
+    if (!tercero) {
+      throw new UnprocessableEntityException(
+        'Este contratista no está pre-registrado en presupuesto. Contacte al área de presupuesto.',
+      );
+    }
 
     const yaExiste = await this.prisma.usuario.findFirst({
       where: {
@@ -55,7 +58,9 @@ export class RegistroContratistasService {
       select: { id: true },
     });
     if (yaExiste) {
-      throw new ConflictException('Ya existe un usuario registrado con esa identificación o correo.');
+      throw new ConflictException(
+        'Ya existe un usuario registrado con esa identificación o correo.',
+      );
     }
 
     const nombre = this.derivarNombre(rut);
@@ -71,9 +76,12 @@ export class RegistroContratistasService {
           passwordHash,
           nombre,
           email: rut.correoElectronico ?? null,
-          codigoTercero: dto.codigoTercero,
+          codigoTercero: tercero.codigoTercero,
           userIdentification: rut.numeroIdentificacion,
           rol: Rol.CONTRATISTA,
+          // La contraseña generada es temporal: el contratista debe cambiarla
+          // en su primer inicio de sesión.
+          mustChangePassword: true,
         },
       });
     } catch {
@@ -106,7 +114,12 @@ export class RegistroContratistasService {
       .join(' ')
       .trim();
 
-    return nombrePersona || rut.razonSocial?.trim() || rut.nombreComercial?.trim() || 'Contratista';
+    return (
+      nombrePersona ||
+      rut.razonSocial?.trim() ||
+      rut.nombreComercial?.trim() ||
+      'Contratista'
+    );
   }
 
   /**
@@ -114,8 +127,11 @@ export class RegistroContratistasService {
    * sufijo numérico (`.2`, `.3`, …) hasta encontrar uno libre.
    */
   async generarUsername(rut: RutExtraidoDto): Promise<string> {
-    const primera = this.normalizar(rut.primerNombre) || this.normalizar(rut.razonSocial);
-    const segunda = this.normalizar(rut.primerApellido) || this.normalizar(rut.nombreComercial);
+    const primera =
+      this.normalizar(rut.primerNombre) || this.normalizar(rut.razonSocial);
+    const segunda =
+      this.normalizar(rut.primerApellido) ||
+      this.normalizar(rut.nombreComercial);
 
     let base = [primera, segunda].filter((p) => p.length > 0).join('.');
     if (!base) {

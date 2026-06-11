@@ -4,9 +4,11 @@ import { AuthService } from './auth.service';
 import { LoginDto } from '../dto/login.dto';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { DevTokenDto } from '../dto/dev-token.dto';
+import { CambiarPasswordDto } from '../dto/cambiar-password.dto';
 import { Public } from '../decorators/public.decorator';
 import { Roles } from '../decorators/roles.decorator';
 import { CurrentUser } from '../decorators/current-user.decorator';
+import { AllowPasswordChange } from '../decorators/allow-password-change.decorator';
 import { Rol } from '../interfaces/jwt-payload.interface';
 import type { JwtPayload } from '../interfaces/jwt-payload.interface';
 
@@ -47,7 +49,25 @@ export class AuthController {
     return this.service.devToken(dto);
   }
 
+  @Post('cambiar-password')
+  @AllowPasswordChange()
+  @HttpCode(200)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Cambia la contraseña del usuario autenticado',
+    description:
+      'Valida la contraseña actual, exige una nueva con buena complejidad, ' +
+      'desactiva el cambio obligatorio y devuelve un token nuevo ya habilitado.',
+  })
+  cambiarPassword(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: CambiarPasswordDto,
+  ) {
+    return this.service.cambiarPassword(user.sub, dto);
+  }
+
   @Get('me')
+  @AllowPasswordChange()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Retorna el usuario autenticado desde el token' })
   me(@CurrentUser() user: JwtPayload) {

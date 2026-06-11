@@ -10,7 +10,10 @@ export class CertificadoBancarioDto {
   @IsString()
   entidadBancaria?: string | null;
 
-  @ApiPropertyOptional({ example: '1', description: 'Tipo de cuenta (ej. 1=ahorros, 2=corriente)' })
+  @ApiPropertyOptional({
+    example: '1',
+    description: 'Tipo de cuenta (ej. 1=ahorros, 2=corriente)',
+  })
   @IsOptional()
   @IsString()
   tipoCuenta?: string | null;

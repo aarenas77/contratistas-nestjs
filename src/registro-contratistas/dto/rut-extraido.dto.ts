@@ -1,10 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsArray,
-  IsInt,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsArray, IsInt, IsOptional, IsString } from 'class-validator';
 
 /**
  * Forma del objeto `rut` que devuelve el endpoint legacy de extracción.
@@ -22,7 +17,10 @@ export class RutExtraidoDto {
   @IsString()
   tipoDocumento?: string | null;
 
-  @ApiProperty({ example: '1036662102', description: 'Número de identificación (cédula o NIT)' })
+  @ApiProperty({
+    example: '1036662102',
+    description: 'Número de identificación (cédula o NIT)',
+  })
   @IsString()
   numeroIdentificacion: string;
 

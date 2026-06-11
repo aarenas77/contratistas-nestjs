@@ -11,4 +11,5 @@ export interface JwtPayload {
   codigoTercero: string;
   userIdentification: string;
   rol: Rol;
+  mustChangePassword?: boolean;
 }

@@ -7,6 +7,7 @@ import { AuthController } from './auth/auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { PasswordChangeGuard } from './guards/password-change.guard';
 
 @Global()
 @Module({
@@ -24,6 +25,7 @@ import { RolesGuard } from './guards/roles.guard';
     JwtStrategy,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: PasswordChangeGuard },
   ],
   controllers: [AuthController],
   exports: [JwtModule],

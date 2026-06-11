@@ -1,13 +1,9 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
 import { DatosExtraidosDto } from './datos-extraidos.dto';
 
 /**
  * Payload de `POST /registro-contratistas/finalizar`. Reenvía los datos
- * extraídos (flujo stateless) más el `codigoTercero` obtenido en el paso previo.
+ * extraídos (flujo stateless). El `codigoTercero` NO viaja desde el cliente: se
+ * resuelve server-side desde la identificación del RUT vía el módulo de
+ * presupuesto, para evitar que un cliente inyecte el tercero de otra persona.
  */
-export class FinalizarRegistroDto extends DatosExtraidosDto {
-  @ApiProperty({ example: 'TMP-3f9a2c1b', description: 'Código de tercero (por ahora temporal)' })
-  @IsString()
-  codigoTercero: string;
-}
+export class FinalizarRegistroDto extends DatosExtraidosDto {}

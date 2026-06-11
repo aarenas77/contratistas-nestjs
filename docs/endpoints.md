@@ -13,6 +13,7 @@
 | `CONTRATISTA` | Crea y gestiona sus propias cuentas de cobro |
 | `SUPERVISOR` | Revisa cuentas radicadas de sus contratistas |
 | `APROBADOR` | Aprueba cuentas revisadas. Crea usuarios |
+| `ADMINISTRADOR` | Acceso transversal. Precarga terceros desde presupuesto |
 
 ---
 
@@ -43,8 +44,14 @@ ALIMENTACION | TRANSPORTE | ALOJAMIENTO | OTROS
 |---|---|---|---|
 | `POST` | `/auth/login` | Público | Login con username y password |
 | `POST` | `/auth/dev-token` | Público (solo dev) | Genera token de desarrollo |
+| `POST` | `/auth/cambiar-password` | Cualquier rol | Cambia la contraseña del usuario autenticado |
 | `GET` | `/auth/me` | Cualquier rol | Retorna el usuario del token actual |
 | `POST` | `/auth/usuarios` | `APROBADOR` | Crea un nuevo usuario en el sistema |
+
+> **Contraseña temporal:** el usuario creado por el registro de contratistas recibe una
+> contraseña **temporal** (`mustChangePassword: true`). Hasta que la cambie vía
+> `POST /auth/cambiar-password`, el backend responde **`403`** a cualquier otro endpoint
+> protegido (se exceptúan `/auth/cambiar-password` y `/auth/me`).
 
 ---
 
@@ -65,10 +72,40 @@ ALIMENTACION | TRANSPORTE | ALOJAMIENTO | OTROS
   "user": {
     "nombre": "string",
     "codigoTercero": "string",
-    "rol": "CONTRATISTA | SUPERVISOR | APROBADOR"
+    "rol": "CONTRATISTA | SUPERVISOR | APROBADOR",
+    "mustChangePassword": true
   }
 }
 ```
+
+Si `mustChangePassword` es `true`, el frontend debe redirigir a la pantalla de cambio de
+contraseña: el backend bloqueará (`403`) cualquier otra operación hasta que se cambie.
+
+---
+
+### `POST /auth/cambiar-password`
+
+Requiere token. Disponible incluso cuando la contraseña está pendiente de cambio.
+
+**Body**
+```json
+{
+  "passwordActual": "string",
+  "passwordNueva": "string (min 8, mayúscula + minúscula + dígito + símbolo)"
+}
+```
+
+**Response `200`**
+```json
+{
+  "mensaje": "Contraseña actualizada correctamente.",
+  "accessToken": "string"
+}
+```
+
+Usar el `accessToken` devuelto para las siguientes peticiones (ya viene habilitado, sin el
+bloqueo de cambio obligatorio). Errores: `401` si la contraseña actual es incorrecta, `400`
+si la nueva es igual a la actual o no cumple la complejidad.
 
 ---
 
@@ -108,7 +145,8 @@ Sin body.
   "nombre": "string",
   "codigoTercero": "string",
   "userIdentification": "string",
-  "rol": "CONTRATISTA | SUPERVISOR | APROBADOR"
+  "rol": "CONTRATISTA | SUPERVISOR | APROBADOR",
+  "mustChangePassword": false
 }
 ```
 
@@ -152,13 +190,14 @@ Sin body.
 Registro por pasos para contratistas invitados (sin autenticación previa). El frontend conserva
 los datos extraídos y los reenvía al finalizar (flujo *stateless*).
 
-> **Nota temporal:** el `codigoTercero` real proviene de un sistema de precarga aún no integrado.
-> Mientras tanto se usa el endpoint `codigo-tercero-temporal` que genera un placeholder único.
+> **Nota:** el `codigoTercero` se resuelve **server-side** a partir de la identificación del RUT,
+> consultando el [módulo Presupuesto](#módulo-presupuesto--presupuesto) (precarga temporal). El cliente
+> **no** envía `codigoTercero`. El contratista debe estar precargado antes de finalizar; de lo contrario
+> `finalizar` responde `422`.
 
 | Método | Ruta | Roles | Descripción |
 |---|---|---|---|
 | `POST` | `/registro-contratistas/extraer` | Público | Extrae datos del RUT y la certificación bancaria desde los PDFs |
-| `POST` | `/registro-contratistas/codigo-tercero-temporal` | Público | Genera un `codigoTercero` temporal |
 | `POST` | `/registro-contratistas/finalizar` | Público | Crea el usuario contratista y devuelve sus credenciales |
 
 ---
@@ -208,32 +247,21 @@ certificadoBancario: archivo PDF (max 10 MB, requerido)
 }
 ```
 
-> La extracción se delega a un servicio legacy configurado por `GESTION_CONTRATISTAS_URL`,
-> `LEGACY_EXTRACCION_PATH` y `LEGACY_API_TOKEN`. Si el legacy falla responde `502`.
-
----
-
-### `POST /registro-contratistas/codigo-tercero-temporal`
-
-Sin body.
-
-**Response `200`**
-```json
-{
-  "codigoTercero": "TMP-3f9a2c1b"
-}
-```
+> La extracción es **local** (sin servicios externos): el RUT se parsea posicionalmente con
+> `pdfjs-dist` y el certificado bancario por texto (parsers por banco, ej. Bancolombia).
+> **Ambos PDFs deben tener texto seleccionable**; si alguno es una imagen/escaneo responde `400`
+> pidiendo volver a cargarlo con texto.
 
 ---
 
 ### `POST /registro-contratistas/finalizar`
 
-**Body** — reenvía los datos extraídos más el `codigoTercero` obtenido en el paso previo.
+**Body** — reenvía los datos extraídos. **No** incluye `codigoTercero`: se resuelve server-side desde
+`rut.numeroIdentificacion` vía el módulo Presupuesto.
 ```json
 {
   "rut": { "...": "objeto rut devuelto por /extraer" },
-  "certificadoBancario": { "...": "objeto certificadoBancario devuelto por /extraer" },
-  "codigoTercero": "TMP-3f9a2c1b"
+  "certificadoBancario": { "...": "objeto certificadoBancario devuelto por /extraer" }
 }
 ```
 
@@ -246,7 +274,7 @@ Sin body.
     "id": "bigint",
     "nombre": "BRANDEL DANIEL OTERO ARANGO",
     "email": "comercial@industriasoteros.com.co",
-    "codigoTercero": "TMP-3f9a2c1b",
+    "codigoTercero": "123456",
     "rol": "CONTRATISTA"
   }
 }
@@ -255,6 +283,128 @@ Sin body.
 - `username` se genera como `primernombre.primerapellido` (normalizado, con sufijo numérico si colisiona).
 - `password` es aleatoria y se devuelve en texto plano **una sola vez** para que el sistema invocante envíe el correo de bienvenida.
 - Responde `409` si ya existe un usuario con esa identificación o correo.
+- Responde `422` si la identificación del RUT no está precargada en presupuesto.
+
+---
+
+## Módulo Presupuesto — `/presupuesto`
+
+> **Stub temporal.** Simula el módulo de presupuesto (aún no integrado), que pre-asigna a cada
+> contratista un `codigoTercero` con sus contratos y cuentas de cobro. Toda la integración pasa por
+> una única costura (`PresupuestoGateway`); el día que exista la API real, se reemplaza esa pieza y
+> se elimina este módulo.
+
+| Método | Ruta | Roles | Descripción |
+|---|---|---|---|
+| `POST` | `/presupuesto/precarga` | `ADMINISTRADOR` | Precarga un tercero con sus contratos y cuentas (idempotente) |
+| `GET` | `/presupuesto/tercero` | Público | Consulta el tercero precargado y sus contratos por identificación |
+
+---
+
+### `POST /presupuesto/precarga`
+
+Carga (o reemplaza) la precarga de un tercero. **Idempotente:** re-cargar la misma identificación
+actualiza en vez de duplicar; las cuentas de cobro shell del contrato se reemplazan en cada carga.
+El payload ahora acepta la misma estructura de campos que devuelven `GET /contratos` y
+`GET /cuentas-cobro`, para mantener uniformidad entre endpoints. Los campos de solo lectura
+(`idPago`, `ticket`, `contrato`, `idEstado`, `disponibleParaRadicar`) se aceptan para simetría,
+pero el backend persiste solo los campos soportados por el modelo.
+
+**Body**
+```json
+{
+  "numeroIdentificacion": "1036662102",
+  "tipoIdentificacion": "CC",
+  "codigoTercero": "123456",
+  "nombre": "Brandel Otero",
+  "contratos": [
+    {
+      "codigoContrato": 39492,
+      "codigoTercero": "123456",
+      "consecutivo": "CO-2026-001",
+      "descripcion": "Mantenimiento de equipos",
+      "valor": 60000000,
+      "totalPago": 60000000,
+      "estado": "A",
+      "fechaElaboracion": "2026-01-01",
+      "fechaAprobacion": "2026-01-15",
+      "fechaRegistro": "2026-01-01",
+      "fechaInicioSecop": "2026-01-01",
+      "fechaFin": "2026-12-31",
+      "tipoPlazo": "D",
+      "plazoDias": 365,
+      "consecutivoCompromiso": 1,
+      "estadoCompromiso": "A",
+      "numeroActaInicioString": 12,
+      "saldoDisponibleOtrosGastos": 0,
+      "idSupervisor": "string (opcional, codigoTercero del supervisor)",
+      "codigoDependencia": 11,
+      "codigoMempresa": 9999999999,
+      "cuentas": [
+        {
+          "idPago": 1,
+          "ticket": 1,
+          "contrato": "CO-2026-001",
+          "codigoContrato": 39492,
+          "codigoTercero": "123456",
+          "codigoTerceroSupervisor": "123457",
+          "codigoTerceroAprobador": "123458",
+          "idEstado": 0,
+          "estado": "BORRADOR",
+          "fechaInicio": "2026-01-01",
+          "fechaFin": "2026-01-31",
+          "fechaSolicitud": "2026-01-15T12:00:00.000Z",
+          "valorSolicitud": 5000000,
+          "disponibleParaRadicar": true
+        }
+      ]
+    }
+  ]
+}
+```
+
+> Campos opcionales del contrato (`totalPago`, `estado`, fechas, `tipoPlazo`, `plazoDias`,
+> `consecutivoCompromiso`, `estadoCompromiso`, `numeroActaInicioString`,
+> `saldoDisponibleOtrosGastos`, `idSupervisor`, `codigoDependencia`, `codigoMempresa`)
+> usan defaults razonables si se omiten. En cuentas, `valorSolicitud` y `valorCobrado`
+> se aceptan como sinónimos de entrada.
+
+**Response `201`**
+```json
+{
+  "numeroIdentificacion": "1036662102",
+  "codigoTercero": "123456"
+}
+```
+
+---
+
+### `GET /presupuesto/tercero`
+
+Usado por el wizard de registro para mostrar los contratos del contratista **antes** de finalizar.
+
+**Query params**
+```
+numeroIdentificacion: string  (requerido)
+```
+
+**Response `200`**
+```json
+{
+  "codigoTercero": "123456",
+  "nombre": "Brandel Otero",
+  "contratos": [
+    {
+      "codigoContrato": 39492,
+      "consecutivo": "CO-2026-001",
+      "descripcion": "Mantenimiento de equipos",
+      "valor": 60000000
+    }
+  ]
+}
+```
+
+- Responde `404` si la identificación no está precargada en presupuesto.
 
 ---
 
@@ -1149,15 +1299,16 @@ Si la cuenta está en `APROBADA_SUPERVISOR`, pasa automáticamente a `EN_REVISIO
 | # | Módulo | Total endpoints |
 |---|---|---|
 | 1 | Auth | 4 |
-| 2 | Registro de Contratistas | 3 |
-| 3 | Contratos | 1 |
-| 4 | Cuentas de Cobro | 5 |
-| 5 | Actividades | 4 |
-| 6 | Gastos | 4 |
-| 7 | Planilla | 2 |
-| 8 | Checklist Retefuente | 2 |
-| 9 | Supervisor | 13 |
-| 10 | Aprobador | 13 |
-| | **Total** | **51** |
+| 2 | Registro de Contratistas | 2 |
+| 3 | Presupuesto | 2 |
+| 4 | Contratos | 1 |
+| 5 | Cuentas de Cobro | 5 |
+| 6 | Actividades | 4 |
+| 7 | Gastos | 4 |
+| 8 | Planilla | 2 |
+| 9 | Checklist Retefuente | 2 |
+| 10 | Supervisor | 13 |
+| 11 | Aprobador | 13 |
+| | **Total** | **52** |
 
 > Los IDs numéricos grandes (`cuentaCobroId`, `actividadId`, `gastoId`, `adjuntoId`) son de tipo `BigInt`.

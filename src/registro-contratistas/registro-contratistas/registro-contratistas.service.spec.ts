@@ -1,11 +1,15 @@
-import { ConflictException } from '@nestjs/common';
+import {
+  ConflictException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
 import { RegistroContratistasService } from './registro-contratistas.service';
 import { PrismaService } from '../../prisma/prisma/prisma.service';
-import { ExtraccionLegacyService } from '../extraccion/extraccion-legacy.service';
+import { ExtraccionService } from '../extraccion/extraccion.service';
 import { RutExtraidoDto } from '../dto/rut-extraido.dto';
 import { FinalizarRegistroDto } from '../dto/finalizar-registro.dto';
+import { PRESUPUESTO_GATEWAY } from '../../presupuesto/presupuesto.gateway';
 
 const mockPrismaService = {
   usuario: {
@@ -17,6 +21,10 @@ const mockPrismaService = {
 
 const mockExtraccion = {
   extraer: jest.fn(),
+};
+
+const mockGateway = {
+  obtenerTerceroPorIdentificacion: jest.fn(),
 };
 
 const rutBase: RutExtraidoDto = {
@@ -36,11 +44,14 @@ describe('RegistroContratistasService', () => {
       providers: [
         RegistroContratistasService,
         { provide: PrismaService, useValue: mockPrismaService },
-        { provide: ExtraccionLegacyService, useValue: mockExtraccion },
+        { provide: ExtraccionService, useValue: mockExtraccion },
+        { provide: PRESUPUESTO_GATEWAY, useValue: mockGateway },
       ],
     }).compile();
 
-    service = module.get<RegistroContratistasService>(RegistroContratistasService);
+    service = module.get<RegistroContratistasService>(
+      RegistroContratistasService,
+    );
     jest.clearAllMocks();
   });
 
@@ -99,16 +110,6 @@ describe('RegistroContratistasService', () => {
     });
   });
 
-  describe('generarCodigoTerceroTemporal', () => {
-    it('genera un código con prefijo TMP- único', async () => {
-      mockPrismaService.usuario.findFirst.mockResolvedValue(null);
-
-      const codigo = await service.generarCodigoTerceroTemporal();
-
-      expect(codigo).toMatch(/^TMP-[0-9a-f]{8}$/);
-    });
-  });
-
   describe('finalizar', () => {
     const dto: FinalizarRegistroDto = {
       rut: rutBase,
@@ -117,10 +118,13 @@ describe('RegistroContratistasService', () => {
         tipoCuenta: '1',
         numeroCuenta: '36593235038',
       },
-      codigoTercero: 'TMP-3f9a2c1b',
     };
 
-    it('crea el usuario con rol CONTRATISTA y devuelve credenciales en claro', async () => {
+    it('resuelve el codigoTercero real desde el gateway y crea el usuario', async () => {
+      mockGateway.obtenerTerceroPorIdentificacion.mockResolvedValue({
+        codigoTercero: '123456',
+        nombre: 'Brandel Otero',
+      });
       mockPrismaService.usuario.findFirst.mockResolvedValue(null);
       mockPrismaService.usuario.findUnique.mockResolvedValue(null);
       mockPrismaService.usuario.create.mockImplementation(({ data }: any) =>
@@ -129,15 +133,19 @@ describe('RegistroContratistasService', () => {
 
       const result = await service.finalizar(dto);
 
+      expect(mockGateway.obtenerTerceroPorIdentificacion).toHaveBeenCalledWith(
+        '1036662102',
+      );
       expect(mockPrismaService.usuario.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             username: 'brandel.otero',
             nombre: 'BRANDEL DANIEL OTERO ARANGO',
             email: 'comercial@industriasoteros.com.co',
-            codigoTercero: 'TMP-3f9a2c1b',
+            codigoTercero: '123456',
             userIdentification: '1036662102',
             rol: 'CONTRATISTA',
+            mustChangePassword: true,
           }),
         }),
       );
@@ -147,7 +155,20 @@ describe('RegistroContratistasService', () => {
       expect(result.usuario.rol).toBe('CONTRATISTA');
     });
 
+    it('lanza UnprocessableEntityException si la cédula no está precargada en presupuesto', async () => {
+      mockGateway.obtenerTerceroPorIdentificacion.mockResolvedValue(null);
+
+      await expect(service.finalizar(dto)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+      expect(mockPrismaService.usuario.create).not.toHaveBeenCalled();
+    });
+
     it('hashea la contraseña antes de persistir (no guarda texto plano)', async () => {
+      mockGateway.obtenerTerceroPorIdentificacion.mockResolvedValue({
+        codigoTercero: '123456',
+        nombre: null,
+      });
       mockPrismaService.usuario.findFirst.mockResolvedValue(null);
       mockPrismaService.usuario.findUnique.mockResolvedValue(null);
       let hashGuardado = '';
@@ -159,13 +180,21 @@ describe('RegistroContratistasService', () => {
       const result = await service.finalizar(dto);
 
       expect(hashGuardado).not.toBe(result.password);
-      await expect(bcrypt.compare(result.password, hashGuardado)).resolves.toBe(true);
+      await expect(bcrypt.compare(result.password, hashGuardado)).resolves.toBe(
+        true,
+      );
     });
 
     it('lanza ConflictException si ya existe usuario con esa identificación o correo', async () => {
+      mockGateway.obtenerTerceroPorIdentificacion.mockResolvedValue({
+        codigoTercero: '123456',
+        nombre: null,
+      });
       mockPrismaService.usuario.findFirst.mockResolvedValue({ id: 5n });
 
-      await expect(service.finalizar(dto)).rejects.toBeInstanceOf(ConflictException);
+      await expect(service.finalizar(dto)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
       expect(mockPrismaService.usuario.create).not.toHaveBeenCalled();
     });
   });

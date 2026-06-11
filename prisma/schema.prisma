@@ -68,6 +68,17 @@ model Contrato {
   @@map("contratos")
 }
 
+model PrecargaTercero {
+  id                   BigInt   @id @default(autoincrement())
+  tipoIdentificacion   String?  @map("tipo_identificacion")
+  numeroIdentificacion String   @unique @map("numero_identificacion")
+  codigoTercero        String   @unique @map("codigo_tercero")
+  nombre               String?
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@map("precarga_terceros")
+}
+
 model Usuario {
   id                 BigInt   @id @default(autoincrement())
   username           String   @unique
@@ -78,6 +89,7 @@ model Usuario {
   userIdentification String   @map("user_identification")
   rol                Rol
   activo             Boolean  @default(true)
+  mustChangePassword Boolean  @default(false) @map("must_change_password")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 

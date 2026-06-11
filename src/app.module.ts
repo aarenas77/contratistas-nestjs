@@ -12,6 +12,7 @@ import { SupervisorModule } from './supervisor/supervisor.module';
 import { AprobadorModule } from './aprobador/aprobador.module';
 import { ContratosModule } from './contratos/contratos.module';
 import { RegistroContratistasModule } from './registro-contratistas/registro-contratistas.module';
+import { PresupuestoModule } from './presupuesto/presupuesto.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -28,6 +29,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AprobadorModule,
     ContratosModule,
     RegistroContratistasModule,
+    PresupuestoModule,
   ],
   controllers: [AppController],
   providers: [AppService],
