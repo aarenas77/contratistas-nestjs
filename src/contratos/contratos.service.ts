@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma/prisma.service';
 import { ListarContratosDto } from './dto/listar-contratos.dto';
 
@@ -57,6 +57,48 @@ export class ContratosService {
           content,
         },
       },
+    };
+  }
+
+  async obtenerSupervisor(codigoContrato: number) {
+    const contrato = await this.prisma.contrato.findUnique({
+      where: { codigoContrato },
+      select: { idSupervisor: true },
+    });
+
+    if (!contrato) {
+      throw new NotFoundException('Contrato no encontrado');
+    }
+
+    const sinSupervisor = {
+      success: false,
+      message:
+        'El contrato no tiene un supervisor asociado. Comuníquese con el administrador.',
+      data: null,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (!contrato.idSupervisor) {
+      return sinSupervisor;
+    }
+
+    const supervisor = await this.prisma.usuario.findFirst({
+      where: { codigoTercero: contrato.idSupervisor, rol: 'SUPERVISOR' },
+      select: { nombre: true, codigoTercero: true },
+    });
+
+    if (!supervisor) {
+      return sinSupervisor;
+    }
+
+    return {
+      success: true,
+      message: 'Supervisor encontrado',
+      data: {
+        nombreSupervisor: supervisor.nombre,
+        codigoTerceroSupervisor: supervisor.codigoTercero,
+      },
+      timestamp: new Date().toISOString(),
     };
   }
 }

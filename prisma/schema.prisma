@@ -163,6 +163,10 @@ model Planilla {
   numeroPlanilla        String?       @map("numero_planilla")
   urlPago               String?       @map("url_pago")
   estadoPago            String?       @map("estado_pago")
+  pinPagoSimple         String?       @map("pin_pago_simple")
+  pinExpiraAt           DateTime?     @map("pin_expira_at")
+  intentosPagoSimple    Int           @default(0) @map("intentos_pago_simple")
+  ultimaConfirmacionAt  DateTime?     @map("ultima_confirmacion_at")
 
   cuentaCobro   CuentaCobro @relation(fields: [cuentaCobroId], references: [id])
 

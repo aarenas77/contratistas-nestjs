@@ -51,7 +51,8 @@ const contratos = [
   {
     codigoContrato: 39492,
     consecutivo: '0433-2026',
-    descripcion: 'CONTRATO 0433 DE 2026. PRESTACION DE SERVICIOS PROFESIONALES EN EL DESARROLLO DEL PROYECTO ESTRATEGIAS PARA GARANTIZAR EL ACCESO A LA EDUCACION Y FORTALECER LA PERMANENCIA EDUCATIVA DE LOS NIÑOS, NIÑAS, ADOLESCENTES, JOVENES Y ADULTOS DE BELLO. PLAZO 4 MESES. FORMA DE PAGO ACTAS PARCIALES PREVIA AUTORIZACION DEL SUPERVISOR.',
+    descripcion:
+      'CONTRATO 0433 DE 2026. PRESTACION DE SERVICIOS PROFESIONALES EN EL DESARROLLO DEL PROYECTO ESTRATEGIAS PARA GARANTIZAR EL ACCESO A LA EDUCACION Y FORTALECER LA PERMANENCIA EDUCATIVA DE LOS NIÑOS, NIÑAS, ADOLESCENTES, JOVENES Y ADULTOS DE BELLO. PLAZO 4 MESES. FORMA DE PAGO ACTAS PARCIALES PREVIA AUTORIZACION DEL SUPERVISOR.',
     codigoTercero: '743',
     valor: 16800000,
     totalPago: 16800000,
@@ -74,7 +75,8 @@ const contratos = [
   {
     codigoContrato: 38489,
     consecutivo: '1315-2025',
-    descripcion: 'Contrato 1315 de 2025, Prestación de Servicios Profesionales en el desarrollo del proyecto "Creación de entornos Protectores con Fortalecimiento de la Convivencia Escolar, la salud Mental, la Inclusión y la Diversidad en la Comunidad Educativa del Municipio de Bello", plazo 4 meses y 20 dias, pago parcial.',
+    descripcion:
+      'Contrato 1315 de 2025, Prestación de Servicios Profesionales en el desarrollo del proyecto "Creación de entornos Protectores con Fortalecimiento de la Convivencia Escolar, la salud Mental, la Inclusión y la Diversidad en la Comunidad Educativa del Municipio de Bello", plazo 4 meses y 20 dias, pago parcial.',
     codigoTercero: '743',
     valor: 18666666,
     totalPago: 18666666,
@@ -97,7 +99,8 @@ const contratos = [
   {
     codigoContrato: 37479,
     consecutivo: '0564 de 2025',
-    descripcion: 'CONTRATO 0564 DE 2025. OBJETO CONTRATO PRESTACIÓN DE SERVICIOS PROFESIONALES EN EL DESARROLLO DEL PROYECTO "ESTRATEGIAS PARA GARANTIZAR EL ACCESO A LA EDUCACIÓN Y FORTALECER LA PERMANENCIA EDUCATIVA DE LOS NIÑOS, NIÑAS, ADOLESCENTES, JÓVENES Y ADULTOS BELLANITAS" PLAZO CUATRO MESES. FORMA DE PAGO ACTAS PARCIALES PREVIA AUTORIZACION DEL SUPERVISOR.',
+    descripcion:
+      'CONTRATO 0564 DE 2025. OBJETO CONTRATO PRESTACIÓN DE SERVICIOS PROFESIONALES EN EL DESARROLLO DEL PROYECTO "ESTRATEGIAS PARA GARANTIZAR EL ACCESO A LA EDUCACIÓN Y FORTALECER LA PERMANENCIA EDUCATIVA DE LOS NIÑOS, NIÑAS, ADOLESCENTES, JÓVENES Y ADULTOS BELLANITAS" PLAZO CUATRO MESES. FORMA DE PAGO ACTAS PARCIALES PREVIA AUTORIZACION DEL SUPERVISOR.',
     codigoTercero: '743',
     valor: 16000000,
     totalPago: 16000000,
@@ -162,6 +165,144 @@ const cuentasCobro = [
   },
 ];
 
+const LIMITE_GENERACION_MES = new Date(Date.UTC(2027, 5, 1));
+
+type CuentaMensualSeed = {
+  codigoContrato: number;
+  codigoTercero: string;
+  codigoTerceroSupervisor: string | null;
+  codigoTerceroAprobador: string | null;
+  estado: 'BORRADOR';
+  fechaSolicitud: Date | null;
+  fechaInicio: Date;
+  fechaFin: Date;
+  valorCobrado: number;
+};
+
+function inicioDelMesUtc(fecha: Date) {
+  return new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), 1));
+}
+
+function finDelMesUtc(fecha: Date) {
+  return new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth() + 1, 0));
+}
+
+function sumarMesesUtc(fecha: Date, meses: number) {
+  return new Date(
+    Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth() + meses, 1),
+  );
+}
+
+function minMes(a: Date, b: Date) {
+  if (a.getUTCFullYear() < b.getUTCFullYear()) return a;
+  if (a.getUTCFullYear() > b.getUTCFullYear()) return b;
+  return a.getUTCMonth() <= b.getUTCMonth() ? a : b;
+}
+
+function ultimoMesCompletoDisponible(fechaFin: Date | null) {
+  if (!fechaFin) {
+    return LIMITE_GENERACION_MES;
+  }
+
+  const cierreMes = finDelMesUtc(fechaFin);
+  const inicioMes = inicioDelMesUtc(fechaFin);
+
+  if (fechaFin.getUTCDate() === cierreMes.getUTCDate()) {
+    return inicioMes;
+  }
+
+  return sumarMesesUtc(inicioMes, -1);
+}
+
+function obtenerFechaInicioContrato(contrato: {
+  fechaInicioSecop?: Date | null;
+  fechaRegistro: Date;
+  fechaElaboracion: Date;
+}) {
+  return (
+    contrato.fechaInicioSecop ??
+    contrato.fechaRegistro ??
+    contrato.fechaElaboracion
+  );
+}
+
+function generarCuentasMensuales(contrato: {
+  codigoContrato: number;
+  codigoTercero: string;
+  totalPago: unknown;
+  fechaFin: Date | null;
+  fechaInicioSecop?: Date | null;
+  fechaRegistro: Date;
+  fechaElaboracion: Date;
+  cuentasCobro: Array<{ fechaInicio: Date }>;
+}): CuentaMensualSeed[] {
+  const fechaInicioContrato = obtenerFechaInicioContrato(contrato);
+  const mesInicio = inicioDelMesUtc(fechaInicioContrato);
+  const mesFin = minMes(
+    ultimoMesCompletoDisponible(contrato.fechaFin),
+    LIMITE_GENERACION_MES,
+  );
+
+  if (mesFin.getTime() < mesInicio.getTime()) {
+    return [];
+  }
+
+  const totalMeses =
+    (mesFin.getUTCFullYear() - mesInicio.getUTCFullYear()) * 12 +
+    (mesFin.getUTCMonth() - mesInicio.getUTCMonth()) +
+    1;
+
+  const totalPago = Number(contrato.totalPago);
+  const totalCentavos = Math.round(totalPago * 100);
+  const baseCentavos = Math.floor(totalCentavos / totalMeses);
+
+  const existentesPorMes = new Set(
+    contrato.cuentasCobro.map(
+      (cc) =>
+        `${cc.fechaInicio.getUTCFullYear()}-${cc.fechaInicio.getUTCMonth()}`,
+    ),
+  );
+
+  const cuentas: CuentaMensualSeed[] = [];
+  for (let indice = 0; indice < totalMeses; indice += 1) {
+    const mesActual = sumarMesesUtc(mesInicio, indice);
+    const claveMes = `${mesActual.getUTCFullYear()}-${mesActual.getUTCMonth()}`;
+
+    if (existentesPorMes.has(claveMes)) {
+      continue;
+    }
+
+    const fechaInicio = indice === 0 ? fechaInicioContrato : mesActual;
+    const fechaFinMes = finDelMesUtc(mesActual);
+    const esUltimoMes = indice === totalMeses - 1;
+    const fechaFin =
+      esUltimoMes &&
+      contrato.fechaFin &&
+      contrato.fechaFin.getTime() < fechaFinMes.getTime()
+        ? contrato.fechaFin
+        : fechaFinMes;
+
+    const centavos =
+      indice === totalMeses - 1
+        ? totalCentavos - baseCentavos * (totalMeses - 1)
+        : baseCentavos;
+
+    cuentas.push({
+      codigoContrato: contrato.codigoContrato,
+      codigoTercero: contrato.codigoTercero,
+      codigoTerceroSupervisor: null,
+      codigoTerceroAprobador: null,
+      estado: 'BORRADOR' as const,
+      fechaSolicitud: null,
+      fechaInicio,
+      fechaFin,
+      valorCobrado: Number((centavos / 100).toFixed(2)),
+    });
+  }
+
+  return cuentas;
+}
+
 async function main() {
   console.log('Ejecutando seed de usuarios...\n');
 
@@ -171,11 +312,18 @@ async function main() {
 
     await prisma.usuario.upsert({
       where: { username: u.username },
-      update: { passwordHash, nombre: u.nombre, codigoTercero: u.codigoTercero, activo: true },
+      update: {
+        passwordHash,
+        nombre: u.nombre,
+        codigoTercero: u.codigoTercero,
+        activo: true,
+      },
       create: { ...data, passwordHash },
     });
 
-    console.log(`✓  ${u.rol.padEnd(12)} | usuario: ${u.username} | contraseña: ${password}`);
+    console.log(
+      `✓  ${u.rol.padEnd(12)} | usuario: ${u.username} | contraseña: ${password}`,
+    );
   }
 
   console.log('\nEjecutando seed de contratos...\n');
@@ -183,11 +331,17 @@ async function main() {
   for (const c of contratos) {
     await prisma.contrato.upsert({
       where: { codigoContrato: c.codigoContrato },
-      update: { descripcion: c.descripcion, estadoCompromiso: c.estadoCompromiso, codigoTercero: c.codigoTercero },
+      update: {
+        descripcion: c.descripcion,
+        estadoCompromiso: c.estadoCompromiso,
+        codigoTercero: c.codigoTercero,
+      },
       create: c,
     });
 
-    console.log(`✓  Contrato ${c.codigoContrato} | ${c.consecutivo} | codigoTercero: ${c.codigoTercero}`);
+    console.log(
+      `✓  Contrato ${c.codigoContrato} | ${c.consecutivo} | codigoTercero: ${c.codigoTercero}`,
+    );
   }
 
   console.log('\nEjecutando seed de cuentas de cobro...\n');
@@ -197,18 +351,57 @@ async function main() {
     prisma.adjunto.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
     prisma.actividad.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
     prisma.otroGasto.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
-    prisma.checklistRetefuente.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
+    prisma.checklistRetefuente.deleteMany({
+      where: { cuentaCobro: cleanupWhere },
+    }),
     prisma.planilla.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
     prisma.ejecucionFisica.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
-    prisma.informeSupervision.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
+    prisma.informeSupervision.deleteMany({
+      where: { cuentaCobro: cleanupWhere },
+    }),
     prisma.historialEstado.deleteMany({ where: { cuentaCobro: cleanupWhere } }),
     prisma.cuentaCobro.deleteMany({ where: cleanupWhere }),
   ]);
 
   for (const cc of cuentasCobro) {
     const created = await prisma.cuentaCobro.create({ data: cc });
-    console.log(`✓  CuentaCobro id:${created.id} | ticket:${created.ticket} | contrato:${cc.codigoContrato} | estado:${cc.estado}`);
+    console.log(
+      `✓  CuentaCobro id:${created.id} | ticket:${created.ticket} | contrato:${cc.codigoContrato} | estado:${cc.estado}`,
+    );
   }
+
+  console.log(
+    '\nGenerando cuentas de cobro mensuales hasta junio de 2027...\n',
+  );
+
+  const contratosConCuentas = await prisma.contrato.findMany({
+    include: {
+      cuentasCobro: {
+        select: {
+          fechaInicio: true,
+        },
+      },
+    },
+    orderBy: {
+      codigoContrato: 'asc',
+    },
+  });
+
+  const cuentasMensuales = contratosConCuentas.flatMap((contrato) =>
+    generarCuentasMensuales(contrato).map((cuenta) => ({
+      ...cuenta,
+      fechaInicio: new Date(cuenta.fechaInicio),
+      fechaFin: new Date(cuenta.fechaFin),
+    })),
+  );
+
+  if (cuentasMensuales.length > 0) {
+    await prisma.cuentaCobro.createMany({
+      data: cuentasMensuales,
+    });
+  }
+
+  console.log(`Cuentas mensuales generadas: ${cuentasMensuales.length}`);
 
   console.log('\nSeed completado.');
 }
