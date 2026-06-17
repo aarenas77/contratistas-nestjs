@@ -39,11 +39,7 @@ export class ActividadesService {
     codigoTercero: string,
   ) {
     const cuenta = await this.verificarPropietario(cuentaCobroId, codigoTercero);
-    if (cuenta.estado !== 'BORRADOR') {
-      throw new BadRequestException(
-        'Solo se pueden agregar actividades cuando la cuenta está en BORRADOR',
-      );
-    }
+    await this.assertSeccionEditable(cuentaCobroId, cuenta.estado);
     return this.prisma.$transaction(async (tx) => {
       const actividad = await tx.actividad.create({
         data: {
@@ -76,11 +72,7 @@ export class ActividadesService {
     });
     if (!actividad) throw new NotFoundException('Actividad no encontrada');
     if (actividad.cuentaCobro.codigoTercero !== codigoTercero) throw new ForbiddenException();
-    if (actividad.cuentaCobro.estado !== 'BORRADOR') {
-      throw new BadRequestException(
-        'Solo se pueden eliminar actividades cuando la cuenta está en BORRADOR',
-      );
-    }
+    await this.assertSeccionEditable(actividad.cuentaCobroId, actividad.cuentaCobro.estado);
     await this.prisma.$transaction([
       this.prisma.adjunto.deleteMany({ where: { actividadId } }),
       this.prisma.actividad.delete({ where: { id: actividadId } }),
@@ -123,5 +115,22 @@ export class ActividadesService {
     if (!cuenta) throw new NotFoundException('Cuenta de cobro no encontrada');
     if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException();
     return cuenta;
+  }
+
+  /**
+   * Permite editar la sección solo en BORRADOR, o durante la subsanación
+   * (DEVUELTA_CONTRATISTA) cuando el informe de actividades fue rechazado.
+   */
+  private async assertSeccionEditable(cuentaCobroId: bigint, estado: string) {
+    if (estado === 'BORRADOR') return;
+    if (estado === 'DEVUELTA_CONTRATISTA') {
+      const rechazadas = await this.prisma.actividad.count({
+        where: { cuentaCobroId, estadoRevision: 'RECHAZADO' },
+      });
+      if (rechazadas > 0) return;
+    }
+    throw new BadRequestException(
+      'Solo puede editar el informe de actividades en BORRADOR o durante la subsanación de una sección rechazada',
+    );
   }
 }

@@ -650,7 +650,14 @@ Sin body ni query params.
 
 ### `POST /cuentas-cobro/:id/radicar`
 
-Sin body.
+Sin body. Sirve tanto para la **radicación inicial** (desde `BORRADOR`) como para la
+**re-radicación tras subsanación** (desde `DEVUELTA_CONTRATISTA`).
+
+- Desde otro estado responde `400`.
+- En la re-radicación (`DEVUELTA_CONTRATISTA`) **solo se reinician a `PENDIENTE` las secciones
+  que el supervisor había marcado `RECHAZADO`**; las secciones `APROBADO` conservan su estado.
+- La validación de período vigente (`fechaInicio`–`fechaFin`) solo aplica a la radicación inicial;
+  la subsanación puede radicarse aunque el período ya haya vencido.
 
 **Response `200`**
 ```json
@@ -673,6 +680,10 @@ Sin body.
 | `GET` | `/actividades/:cuentaCobroId` | `CONTRATISTA`, `SUPERVISOR`, `APROBADOR` | Lista actividades de la cuenta |
 | `GET` | `/actividades/adjunto/:adjuntoId` | `CONTRATISTA`, `SUPERVISOR`, `APROBADOR` | Descarga el adjunto de una actividad |
 | `DELETE` | `/actividades/:actividadId` | `CONTRATISTA` | Elimina actividad y su adjunto |
+
+> **Edición / subsanación:** agregar y eliminar actividades se permite cuando la cuenta está en
+> `BORRADOR`, o en `DEVUELTA_CONTRATISTA` **solo si la sección de actividades fue rechazada**
+> (`estadoRevision = RECHAZADO`). En cualquier otro caso responde `400`.
 
 ---
 
@@ -769,6 +780,10 @@ Sin body.
 | `GET` | `/gastos/adjunto/:adjuntoId` | `CONTRATISTA`, `SUPERVISOR`, `APROBADOR` | Descarga la evidencia de un gasto |
 | `DELETE` | `/gastos/:gastoId` | `CONTRATISTA` | Elimina gasto y su evidencia |
 
+> **Edición / subsanación:** agregar y eliminar gastos se permite cuando la cuenta está en
+> `BORRADOR`, o en `DEVUELTA_CONTRATISTA` **solo si la sección de gastos fue rechazada**
+> (`estadoRevision = RECHAZADO`). En cualquier otro caso responde `400`.
+
 ---
 
 ### `POST /gastos/:cuentaCobroId`
@@ -864,6 +879,10 @@ Sin body.
 | `GET` | `/planilla/:cuentaCobroId` | `CONTRATISTA`, `SUPERVISOR`, `APROBADOR` | Obtiene la planilla de seguridad social |
 | `PUT` | `/planilla/:cuentaCobroId` | `CONTRATISTA` | Crea o actualiza la planilla (upsert) |
 
+> **Edición / subsanación:** modificar la planilla y las operaciones de PagoSimple se permiten
+> cuando la cuenta está en `BORRADOR`, o en `DEVUELTA_CONTRATISTA` **solo si la sección de planilla
+> fue rechazada** (`estadoRevision = RECHAZADO`). En cualquier otro caso responde `400`.
+
 ---
 
 ### `GET /planilla/:cuentaCobroId`
@@ -921,6 +940,10 @@ Sin body.
 |---|---|---|---|
 | `GET` | `/checklist-retefuente/:cuentaCobroId` | `CONTRATISTA`, `SUPERVISOR`, `APROBADOR` | Obtiene el checklist (se auto-inicializa si no existe) |
 | `PATCH` | `/checklist-retefuente/:cuentaCobroId` | `CONTRATISTA` | Actualiza respuestas del checklist en bloque |
+
+> **Edición / subsanación:** actualizar el checklist se permite cuando la cuenta está en
+> `BORRADOR`, o en `DEVUELTA_CONTRATISTA` **solo si la sección de retenciones fue rechazada**
+> (`estadoRevision = RECHAZADO`). En cualquier otro caso responde `400`.
 
 ---
 
@@ -984,8 +1007,22 @@ Sin body.
 | `POST` | `/supervisor/cuentas-cobro/:id/secciones/retenciones/rechazar` | `SUPERVISOR` | Rechaza la sección de retenciones |
 | `POST` | `/supervisor/cuentas-cobro/:id/secciones/gastos-adicionales/aprobar` | `SUPERVISOR` | Aprueba la sección de gastos adicionales |
 | `POST` | `/supervisor/cuentas-cobro/:id/secciones/gastos-adicionales/rechazar` | `SUPERVISOR` | Rechaza la sección de gastos adicionales |
+| `POST` | `/supervisor/cuentas-cobro/:id/secciones/ejecucion-fisica/digitar` | `SUPERVISOR` | Digita el porcentaje de ejecución física |
 | `POST` | `/supervisor/cuentas-cobro/:id/secciones/ejecucion-fisica/aprobar` | `SUPERVISOR` | Aprueba la sección de ejecución física |
 | `POST` | `/supervisor/cuentas-cobro/:id/secciones/ejecucion-fisica/rechazar` | `SUPERVISOR` | Rechaza la sección de ejecución física |
+
+> **Flujo de subsanación (rechazo por secciones):**
+> 1. El supervisor revisa la cuenta `RADICADA` aprobando o rechazando cada sección.
+> 2. **En cuanto rechaza la primera sección**, la cuenta pasa **de inmediato** a
+>    `DEVUELTA_CONTRATISTA` y ya no puede aprobarse.
+> 3. El supervisor puede **seguir** aprobando/rechazando el resto de secciones (la revisión por
+>    secciones se permite tanto en `RADICADA` como en `DEVUELTA_CONTRATISTA`).
+> 4. Al terminar, confirma con el **rechazo global** (`POST .../rechazar`) que agrega la observación
+>    general y devuelve formalmente la cuenta al contratista.
+>
+> El contratista ve las secciones rechazadas (con su `observacionRevision`) vía
+> `GET /cuentas-cobro/:id`, corrige **solo esas** secciones y re-radica con
+> `POST /cuentas-cobro/:id/radicar`.
 
 ---
 
@@ -1034,7 +1071,10 @@ size?: number            (min: 1, default: sin límite)
 
 ### `POST /supervisor/cuentas-cobro/:id/aprobar`
 
-Sin body.
+Sin body. La cuenta debe estar en estado `RADICADA`. Si **alguna sección está rechazada**
+(`estadoRevision = RECHAZADO`) responde `400`: una cuenta con rechazos no puede aprobarse, debe
+completarse el rechazo global. Además, el supervisor **debe haber digitado el porcentaje de
+ejecución física** (ver `.../ejecucion-fisica/digitar`); si no, responde `400`.
 
 **Response `200`**
 ```json
@@ -1051,6 +1091,10 @@ Sin body.
 
 ### `POST /supervisor/cuentas-cobro/:id/rechazar`
 
+Rechazo global que devuelve la cuenta al contratista con una observación general. Se permite
+cuando la cuenta está en `RADICADA` o ya en `DEVUELTA_CONTRATISTA` (cierre del rechazo por
+secciones). Desde otro estado responde `400`.
+
 **Body**
 ```json
 {
@@ -1066,6 +1110,35 @@ Sin body.
   "estado": "DEVUELTA_CONTRATISTA",
   "updatedAt": "ISO datetime",
   "mensaje": "string"
+}
+```
+
+---
+
+### `POST /supervisor/cuentas-cobro/:id/secciones/ejecucion-fisica/digitar`
+
+El supervisor revisa la cuenta y digita el porcentaje de ejecución física (con su justificación).
+Crea el registro de ejecución física si no existe, o lo actualiza si ya fue digitado. Se permite
+cuando la cuenta está en `RADICADA` o `DEVUELTA_CONTRATISTA`. **Es obligatorio digitar este
+porcentaje antes de aprobar la cuenta de cobro** (`POST .../aprobar`).
+
+**Body**
+```json
+{
+  "porcentaje": 85.5,
+  "justificacion": "string (max 1000 chars)"
+}
+```
+
+`porcentaje`: número entre 0 y 100, hasta 2 decimales.
+
+**Response `200`**
+```json
+{
+  "mensaje": "Porcentaje de ejecución física registrado",
+  "seccion": "EJECUCION_FISICA",
+  "porcentaje": 85.5,
+  "justificacion": "string"
 }
 ```
 
@@ -1091,6 +1164,11 @@ Sin body.
 ### `POST /supervisor/cuentas-cobro/:id/secciones/{seccion}/rechazar`
 
 Donde `{seccion}` es: `informe-actividades` | `planilla` | `retenciones` | `gastos-adicionales` | `ejecucion-fisica`
+
+Marca la sección como `RECHAZADO` con la justificación. **Si la cuenta estaba en `RADICADA`, la
+transiciona de inmediato a `DEVUELTA_CONTRATISTA`** (registrando el cambio en el historial). Si ya
+estaba en `DEVUELTA_CONTRATISTA`, solo actualiza la sección sin duplicar la transición de estado.
+Se permite con la cuenta en `RADICADA` o `DEVUELTA_CONTRATISTA`.
 
 **Body**
 ```json
@@ -1280,9 +1358,16 @@ Si la cuenta está en `APROBADA_SUPERVISOR`, pasa automáticamente a `EN_REVISIO
                 →  GET  /planilla/:id                           (revisa planilla SS)
                 →  GET  /checklist-retefuente/:id               (revisa checklist)
                 →  POST /supervisor/cuentas-cobro/:id/secciones/{seccion}/aprobar|rechazar
-                →  POST /supervisor/cuentas-cobro/:id/aprobar   (cuenta → APROBADA_SUPERVISOR)
+                   • el 1er rechazo de sección deja la cuenta en DEVUELTA_CONTRATISTA
+                →  POST /supervisor/cuentas-cobro/:id/aprobar   (cuenta → APROBADA_SUPERVISOR; 400 si hay secciones rechazadas)
                    ó
-                →  POST /supervisor/cuentas-cobro/:id/rechazar  (cuenta → DEVUELTA_CONTRATISTA)
+                →  POST /supervisor/cuentas-cobro/:id/rechazar  (rechazo global → DEVUELTA_CONTRATISTA)
+
+4b. SUBSANACIÓN (si la cuenta quedó en DEVUELTA_CONTRATISTA):
+    CONTRATISTA →  GET  /cuentas-cobro/:id                      (ve las secciones RECHAZADO + observación)
+                →  PUT/POST/PATCH/DELETE sobre las secciones rechazadas  (corrige solo lo rechazado)
+                →  POST /cuentas-cobro/:id/radicar              (re-radica → RADICADA; resetea solo lo rechazado)
+                → vuelve al paso 4
 
 5. APROBADOR    →  GET  /aprobador/cuentas-cobro                (lista cuentas pendientes de aprobación)
                 →  GET  /cuentas-cobro/:id                      (revisa detalle completo)

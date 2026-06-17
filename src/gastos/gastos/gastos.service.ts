@@ -39,9 +39,7 @@ export class GastosService {
     codigoTercero: string,
   ) {
     const cuenta = await this.verificarPropietario(cuentaCobroId, codigoTercero);
-    if (cuenta.estado !== 'BORRADOR') {
-      throw new BadRequestException('Solo se pueden agregar gastos cuando la cuenta está en BORRADOR');
-    }
+    await this.assertSeccionEditable(cuentaCobroId, cuenta.estado);
     return this.prisma.$transaction(async (tx) => {
       const gasto = await tx.otroGasto.create({
         data: {
@@ -76,9 +74,7 @@ export class GastosService {
     });
     if (!gasto) throw new NotFoundException('Gasto no encontrado');
     if (gasto.cuentaCobro.codigoTercero !== codigoTercero) throw new ForbiddenException();
-    if (gasto.cuentaCobro.estado !== 'BORRADOR') {
-      throw new BadRequestException('Solo se pueden eliminar gastos cuando la cuenta está en BORRADOR');
-    }
+    await this.assertSeccionEditable(gasto.cuentaCobroId, gasto.cuentaCobro.estado);
     await this.prisma.$transaction([
       this.prisma.adjunto.deleteMany({ where: { gastoId } }),
       this.prisma.otroGasto.delete({ where: { id: gastoId } }),
@@ -121,5 +117,22 @@ export class GastosService {
     if (!cuenta) throw new NotFoundException('Cuenta de cobro no encontrada');
     if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException();
     return cuenta;
+  }
+
+  /**
+   * Permite editar los gastos solo en BORRADOR, o durante la subsanación
+   * (DEVUELTA_CONTRATISTA) cuando la sección de gastos fue rechazada.
+   */
+  private async assertSeccionEditable(cuentaCobroId: bigint, estado: string) {
+    if (estado === 'BORRADOR') return;
+    if (estado === 'DEVUELTA_CONTRATISTA') {
+      const rechazados = await this.prisma.otroGasto.count({
+        where: { cuentaCobroId, estadoRevision: 'RECHAZADO' },
+      });
+      if (rechazados > 0) return;
+    }
+    throw new BadRequestException(
+      'Solo puede editar los gastos en BORRADOR o durante la subsanación de una sección rechazada',
+    );
   }
 }

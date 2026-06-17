@@ -4,6 +4,7 @@ import { SupervisorService } from './supervisor.service';
 import { ListarCuentasSupervisorDto } from '../dto/listar-cuentas-supervisor.dto';
 import { RechazarCuentaDto } from '../dto/rechazar-cuenta.dto';
 import { RechazarSeccionDto } from '../dto/rechazar-seccion.dto';
+import { DigitarEjecucionFisicaDto } from '../dto/digitar-ejecucion-fisica.dto';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { Rol } from '../../auth/interfaces/jwt-payload.interface';
@@ -70,7 +71,7 @@ export class SupervisorController {
     @CurrentUser() user: JwtPayload,
     @Body() dto: RechazarSeccionDto,
   ) {
-    return this.service.rechazarSeccionInformeActividades(BigInt(id), user.codigoTercero, dto.justificacion);
+    return this.service.rechazarSeccionInformeActividades(BigInt(id), user.codigoTercero, user.nombre, dto.justificacion);
   }
 
   @Post('cuentas-cobro/:id/secciones/planilla/aprobar')
@@ -90,7 +91,7 @@ export class SupervisorController {
     @CurrentUser() user: JwtPayload,
     @Body() dto: RechazarSeccionDto,
   ) {
-    return this.service.rechazarSeccionPlanilla(BigInt(id), user.codigoTercero, dto.justificacion);
+    return this.service.rechazarSeccionPlanilla(BigInt(id), user.codigoTercero, user.nombre, dto.justificacion);
   }
 
   @Post('cuentas-cobro/:id/secciones/retenciones/aprobar')
@@ -110,7 +111,7 @@ export class SupervisorController {
     @CurrentUser() user: JwtPayload,
     @Body() dto: RechazarSeccionDto,
   ) {
-    return this.service.rechazarSeccionRetenciones(BigInt(id), user.codigoTercero, dto.justificacion);
+    return this.service.rechazarSeccionRetenciones(BigInt(id), user.codigoTercero, user.nombre, dto.justificacion);
   }
 
   @Post('cuentas-cobro/:id/secciones/gastos-adicionales/aprobar')
@@ -130,7 +131,28 @@ export class SupervisorController {
     @CurrentUser() user: JwtPayload,
     @Body() dto: RechazarSeccionDto,
   ) {
-    return this.service.rechazarSeccionGastosAdicionales(BigInt(id), user.codigoTercero, dto.justificacion);
+    return this.service.rechazarSeccionGastosAdicionales(BigInt(id), user.codigoTercero, user.nombre, dto.justificacion);
+  }
+
+  @Post('cuentas-cobro/:id/secciones/ejecucion-fisica/digitar')
+  @Roles(Rol.SUPERVISOR)
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Digitar el porcentaje de ejecución física',
+    description:
+      'El supervisor registra el porcentaje de ejecución física (y su justificación). Es obligatorio digitarlo antes de aprobar la cuenta de cobro.',
+  })
+  digitarEjecucionFisica(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: DigitarEjecucionFisicaDto,
+  ) {
+    return this.service.digitarEjecucionFisica(
+      BigInt(id),
+      user.codigoTercero,
+      dto.porcentaje,
+      dto.justificacion,
+    );
   }
 
   @Post('cuentas-cobro/:id/secciones/ejecucion-fisica/aprobar')
@@ -150,6 +172,6 @@ export class SupervisorController {
     @CurrentUser() user: JwtPayload,
     @Body() dto: RechazarSeccionDto,
   ) {
-    return this.service.rechazarSeccionEjecucionFisica(BigInt(id), user.codigoTercero, dto.justificacion);
+    return this.service.rechazarSeccionEjecucionFisica(BigInt(id), user.codigoTercero, user.nombre, dto.justificacion);
   }
 }

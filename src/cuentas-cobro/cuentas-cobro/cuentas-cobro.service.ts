@@ -228,23 +228,27 @@ export class CuentasCobroService {
       },
     });
 
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    const fechaInicio = new Date(cuenta.fechaInicio);
-    fechaInicio.setHours(0, 0, 0, 0);
-    const fechaFin = new Date(cuenta.fechaFin);
-    fechaFin.setHours(0, 0, 0, 0);
-    if (hoy < fechaInicio || hoy > fechaFin) {
+    if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException();
+    if (cuenta.estado !== 'BORRADOR' && cuenta.estado !== 'DEVUELTA_CONTRATISTA') {
       throw new BadRequestException(
-        'La cuenta solo puede radicarse dentro del período vigente (fechaInicio - fechaFin)',
+        'Solo se puede radicar una cuenta en estado BORRADOR o en subsanación (DEVUELTA_CONTRATISTA)',
       );
     }
 
-    if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException();
-    if (cuenta.estado !== 'BORRADOR') {
-      throw new BadRequestException(
-        'La cuenta ya fue radicada o no está en estado BORRADOR',
-      );
+    // La validación de período solo aplica a la radicación inicial; la subsanación
+    // de una cuenta devuelta puede ocurrir fuera del período vigente.
+    if (cuenta.estado === 'BORRADOR') {
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      const fechaInicio = new Date(cuenta.fechaInicio);
+      fechaInicio.setHours(0, 0, 0, 0);
+      const fechaFin = new Date(cuenta.fechaFin);
+      fechaFin.setHours(0, 0, 0, 0);
+      if (hoy < fechaInicio || hoy > fechaFin) {
+        throw new BadRequestException(
+          'La cuenta solo puede radicarse dentro del período vigente (fechaInicio - fechaFin)',
+        );
+      }
     }
     if (cuenta.actividades.length === 0) {
       throw new BadRequestException(
@@ -270,32 +274,21 @@ export class CuentasCobroService {
       );
     }
 
+    const estadoAnterior = cuenta.estado;
     return this.prisma.$transaction(async (tx) => {
-      const resetSeccion = {
-        estadoRevision: 'PENDIENTE' as const,
-        observacionRevision: null,
+      // En una re-radicación (subsanación) solo se reinician las secciones que el
+      // supervisor rechazó; las aprobadas conservan su estado. En BORRADOR no hay
+      // secciones RECHAZADO, así que se mantiene el comportamiento original.
+      const resetRechazadas = {
+        where: { cuentaCobroId: id, estadoRevision: 'RECHAZADO' as const },
+        data: { estadoRevision: 'PENDIENTE' as const, observacionRevision: null },
       };
       await Promise.all([
-        tx.actividad.updateMany({
-          where: { cuentaCobroId: id },
-          data: resetSeccion,
-        }),
-        tx.planilla.updateMany({
-          where: { cuentaCobroId: id },
-          data: resetSeccion,
-        }),
-        tx.checklistRetefuente.updateMany({
-          where: { cuentaCobroId: id },
-          data: resetSeccion,
-        }),
-        tx.otroGasto.updateMany({
-          where: { cuentaCobroId: id },
-          data: resetSeccion,
-        }),
-        tx.ejecucionFisica.updateMany({
-          where: { cuentaCobroId: id },
-          data: resetSeccion,
-        }),
+        tx.actividad.updateMany(resetRechazadas),
+        tx.planilla.updateMany(resetRechazadas),
+        tx.checklistRetefuente.updateMany(resetRechazadas),
+        tx.otroGasto.updateMany(resetRechazadas),
+        tx.ejecucionFisica.updateMany(resetRechazadas),
       ]);
       const actualizada = await tx.cuentaCobro.update({
         where: { id },
@@ -304,11 +297,14 @@ export class CuentasCobroService {
       await tx.historialEstado.create({
         data: {
           cuentaCobroId: id,
-          estadoAnterior: 'BORRADOR',
+          estadoAnterior,
           estadoNuevo: 'RADICADA',
           usuarioId: codigoTercero,
           usuarioNombre,
-          observacion: 'Cuenta de cobro radicada por el contratista',
+          observacion:
+            estadoAnterior === 'DEVUELTA_CONTRATISTA'
+              ? 'Cuenta de cobro re-radicada por el contratista tras subsanación'
+              : 'Cuenta de cobro radicada por el contratista',
         },
       });
       return {

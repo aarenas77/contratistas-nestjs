@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Rol } from '../../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../../prisma/prisma/prisma.service';
 import { ActualizarChecklistDto } from '../dto/actualizar-checklist.dto';
@@ -57,7 +57,8 @@ export class ChecklistRetefuenteService {
   }
 
   async actualizar(cuentaCobroId: bigint, dto: ActualizarChecklistDto, codigoTercero: string) {
-    await this.verificarPropietario(cuentaCobroId, codigoTercero);
+    const cuenta = await this.verificarPropietario(cuentaCobroId, codigoTercero);
+    await this.assertSeccionEditable(cuentaCobroId, cuenta.estado);
     await Promise.all(
       dto.respuestas.map((r) =>
         this.prisma.checklistRetefuente.updateMany({
@@ -75,10 +76,27 @@ export class ChecklistRetefuenteService {
   private async verificarPropietario(cuentaCobroId: bigint, codigoTercero: string) {
     const cuenta = await this.prisma.cuentaCobro.findUnique({
       where: { id: cuentaCobroId },
-      select: { codigoTercero: true },
+      select: { codigoTercero: true, estado: true },
     });
     if (!cuenta) throw new NotFoundException('Cuenta de cobro no encontrada');
     if (cuenta.codigoTercero !== codigoTercero) throw new ForbiddenException('No tienes permisos para acceder a esta cuenta');
     return cuenta;
+  }
+
+  /**
+   * Permite editar el checklist solo en BORRADOR, o durante la subsanación
+   * (DEVUELTA_CONTRATISTA) cuando la sección de retenciones fue rechazada.
+   */
+  private async assertSeccionEditable(cuentaCobroId: bigint, estado: string) {
+    if (estado === 'BORRADOR') return;
+    if (estado === 'DEVUELTA_CONTRATISTA') {
+      const rechazados = await this.prisma.checklistRetefuente.count({
+        where: { cuentaCobroId, estadoRevision: 'RECHAZADO' },
+      });
+      if (rechazados > 0) return;
+    }
+    throw new BadRequestException(
+      'Solo puede editar el checklist de retenciones en BORRADOR o durante la subsanación de una sección rechazada',
+    );
   }
 }
