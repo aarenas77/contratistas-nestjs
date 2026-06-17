@@ -34,9 +34,7 @@ export class PlanillaService {
 
   async upsert(cuentaCobroId: bigint, dto: UpsertPlanillaDto, codigoTercero: string) {
     const cuenta = await this.verificarPropietario(cuentaCobroId, codigoTercero);
-    if (cuenta.estado !== 'BORRADOR') {
-      throw new BadRequestException('Solo se puede modificar la planilla cuando la cuenta esta en BORRADOR');
-    }
+    await this.assertSeccionEditable(cuentaCobroId, cuenta.estado);
 
     const totalAportes = dto.aporteSalud + dto.aportePension + dto.aporteArl;
     const totalAportesRedondeado = Math.round(totalAportes * 100);
@@ -71,9 +69,7 @@ export class PlanillaService {
     dto: GenerarPagoSimpleTestDto,
   ) {
     const cuenta = await this.verificarPropietario(cuentaCobroId, codigoTercero);
-    if (cuenta.estado !== 'BORRADOR') {
-      throw new BadRequestException('Solo se puede generar PagoSimple cuando la cuenta esta en BORRADOR');
-    }
+    await this.assertSeccionEditable(cuentaCobroId, cuenta.estado);
 
     const planillaExistente = await this.prisma.planilla.findUnique({ where: { cuentaCobroId } });
     if (planillaExistente?.estadoPago === 'PAGADA') {
@@ -138,9 +134,7 @@ export class PlanillaService {
     dto: ConfirmarPagoSimpleMockDto,
   ) {
     const cuenta = await this.verificarPropietario(cuentaCobroId, codigoTercero);
-    if (cuenta.estado !== 'BORRADOR') {
-      throw new BadRequestException('Solo se puede confirmar PagoSimple cuando la cuenta esta en BORRADOR');
-    }
+    await this.assertSeccionEditable(cuentaCobroId, cuenta.estado);
 
     const planilla = await this.prisma.planilla.findUnique({ where: { cuentaCobroId } });
     if (!planilla) {
@@ -224,6 +218,24 @@ export class PlanillaService {
       throw new ForbiddenException('No tienes permisos para modificar esta planilla');
     }
     return cuenta;
+  }
+
+  /**
+   * Permite editar la planilla solo en BORRADOR, o durante la subsanación
+   * (DEVUELTA_CONTRATISTA) cuando la sección de planilla fue rechazada.
+   */
+  private async assertSeccionEditable(cuentaCobroId: bigint, estado: string) {
+    if (estado === 'BORRADOR') return;
+    if (estado === 'DEVUELTA_CONTRATISTA') {
+      const planilla = await this.prisma.planilla.findUnique({
+        where: { cuentaCobroId },
+        select: { estadoRevision: true },
+      });
+      if (planilla?.estadoRevision === 'RECHAZADO') return;
+    }
+    throw new BadRequestException(
+      'Solo puede modificar la planilla en BORRADOR o durante la subsanación de una sección rechazada',
+    );
   }
 
   private construirDatosFinancieros(
