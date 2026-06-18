@@ -45,6 +45,15 @@ const usuarios = [
     userIdentification: '10000004',
     rol: 'ADMINISTRADOR' as const,
   },
+  {
+    username: 'abogado',
+    password: 'Abogado123!',
+    nombre: 'Laura Abogada',
+    email: 'abogado@cuentascobro.dev',
+    codigoTercero: '44444',
+    userIdentification: '10000005',
+    rol: 'ABOGADO' as const,
+  },
 ];
 
 const contratos = [

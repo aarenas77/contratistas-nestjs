@@ -3,6 +3,7 @@ export enum Rol {
   SUPERVISOR = 'SUPERVISOR',
   APROBADOR = 'APROBADOR',
   ADMINISTRADOR = 'ADMINISTRADOR',
+  ABOGADO = 'ABOGADO',
 }
 
 export interface JwtPayload {

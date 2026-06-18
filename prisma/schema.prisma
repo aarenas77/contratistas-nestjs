@@ -22,6 +22,7 @@ enum Rol {
   SUPERVISOR
   APROBADOR
   ADMINISTRADOR
+  ABOGADO
 }
 
 enum EstadoCuentaCobro {
