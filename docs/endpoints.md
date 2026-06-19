@@ -325,7 +325,7 @@ pero el backend persiste solo los campos soportados por el modelo.
       "descripcion": "Mantenimiento de equipos",
       "valor": 60000000,
       "totalPago": 60000000,
-      "estado": "A",
+      "estado": "ELABORADO",
       "fechaElaboracion": "2026-01-01",
       "fechaAprobacion": "2026-01-15",
       "fechaRegistro": "2026-01-01",

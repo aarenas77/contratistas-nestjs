@@ -11,6 +11,7 @@ import { JwtService } from '@nestjs/jwt';
 const mockPrisma = {
   usuario: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
     update: jest.fn(),
   },
 };
@@ -63,6 +64,43 @@ describe('AuthService', () => {
       expect(mockJwt.sign).toHaveBeenCalledWith(
         expect.objectContaining({ mustChangePassword: true }),
       );
+    });
+  });
+
+  describe('listarContratistas', () => {
+    it('devuelve los usuarios activos con rol CONTRATISTA ordenados por nombre', async () => {
+      mockPrisma.usuario.findMany.mockResolvedValue([
+        {
+          codigoTercero: '200',
+          nombre: 'Ana Contratista',
+          userIdentification: '100200300',
+          email: 'ana@example.com',
+        },
+      ]);
+
+      const result = await service.listarContratistas();
+
+      expect(mockPrisma.usuario.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { rol: 'CONTRATISTA', activo: true },
+          orderBy: { nombre: 'asc' },
+          select: {
+            codigoTercero: true,
+            nombre: true,
+            userIdentification: true,
+            email: true,
+          },
+        }),
+      );
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual([
+        {
+          codigoTercero: '200',
+          nombre: 'Ana Contratista',
+          userIdentification: '100200300',
+          email: 'ana@example.com',
+        },
+      ]);
     });
   });
 

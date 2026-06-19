@@ -1,6 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma/prisma.service';
+import {
+  EstadoContrato,
+  estadosContratoParaFiltro,
+  normalizarEstadoContrato,
+} from './estado-contrato.enum';
 import { ListarContratosDto } from './dto/listar-contratos.dto';
 import { ListarContratosAdminDto } from './dto/listar-contratos-admin.dto';
 import { CreateContratoDto } from './dto/create-contrato.dto';
@@ -12,13 +17,16 @@ type Contrato = Prisma.ContratoGetPayload<{}>;
 export class ContratosService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly estadoInicialContrato = EstadoContrato.ELABORADO;
+  private readonly estadoCompromisoInicial = 'A';
+
   async listar(codigoTercero: string, dto: ListarContratosDto) {
     const page = dto.page ?? 0;
     const size = dto.size ?? 10;
 
     const where: Prisma.ContratoWhereInput = {
       codigoTercero,
-      estado: { not: 'I' },
+      estado: { notIn: [EstadoContrato.INHABILITADO, 'I'] },
     };
 
     const [contratos, totalElements] = await Promise.all([
@@ -40,7 +48,10 @@ export class ContratosService {
 
     const where: Prisma.ContratoWhereInput = {};
     if (dto.codigoTercero) where.codigoTercero = dto.codigoTercero;
-    if (dto.estado) where.estado = dto.estado;
+    if (dto.estado) {
+      const estados = estadosContratoParaFiltro(dto.estado);
+      where.estado = estados.length === 1 ? estados[0] : { in: estados };
+    }
 
     const [contratos, totalElements] = await Promise.all([
       this.prisma.contrato.findMany({
@@ -66,8 +77,8 @@ export class ContratosService {
         codigoTercero: dto.codigoTercero,
         valor: dto.valor,
         totalPago: dto.valor,
-        estado: 'A',
-        estadoCompromiso: 'ELABORADO',
+        estado: this.estadoInicialContrato,
+        estadoCompromiso: this.estadoCompromisoInicial,
         fechaElaboracion: new Date(dto.fechaElaboracion),
         fechaRegistro: new Date(),
         fechaFin: dto.fechaFin ? new Date(dto.fechaFin) : null,
@@ -124,12 +135,12 @@ export class ContratosService {
 
     await this.prisma.contrato.update({
       where: { codigoContrato },
-      data: { estado: 'I' },
+      data: { estado: EstadoContrato.INHABILITADO },
     });
 
     return {
       success: true,
-      message: 'Contrato eliminado (inactivado) correctamente',
+      message: 'Contrato inhabilitado correctamente',
       codigoContrato,
     };
   }
@@ -146,8 +157,8 @@ export class ContratosService {
         codigoTercero: origen.codigoTercero,
         valor: origen.valor,
         totalPago: origen.totalPago,
-        estado: 'A',
-        estadoCompromiso: 'ELABORADO',
+        estado: this.estadoInicialContrato,
+        estadoCompromiso: this.estadoCompromisoInicial,
         fechaElaboracion: origen.fechaElaboracion,
         fechaRegistro: new Date(),
         fechaFin: origen.fechaFin,
@@ -260,7 +271,7 @@ export class ContratosService {
       codigoTercero: Number(c.codigoTercero),
       valor: Number(c.valor),
       totalPago: Number(c.totalPago),
-      estado: c.estado,
+      estado: normalizarEstadoContrato(c.estado),
       fechaElaboracion: c.fechaElaboracion?.toISOString().split('T')[0] ?? null,
       fechaAprobacion: c.fechaAprobacion?.toISOString().split('T')[0] ?? null,
       fechaFin: c.fechaFin?.toISOString().split('T')[0] ?? null,

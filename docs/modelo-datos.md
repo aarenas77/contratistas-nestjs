@@ -79,7 +79,7 @@ erDiagram
         string   codigoTercero "FK lógica -> contratista"
         decimal  valor "18,2"
         decimal  totalPago "18,2"
-        string   estado "default A"
+        string   estado "default ELABORADO"
         date     fechaElaboracion
         date     fechaAprobacion "nullable"
         date     fechaFin "nullable"

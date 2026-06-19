@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsInt, IsString, Min, Max } from 'class-validator';
+import { IsOptional, IsInt, IsString, Min, Max, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { EstadoContrato } from '../estado-contrato.enum';
 
 export class ListarContratosAdminDto {
   @ApiPropertyOptional({ example: 0, description: 'Número de página (base 0)', default: 0 })
@@ -23,8 +24,12 @@ export class ListarContratosAdminDto {
   @IsString()
   codigoTercero?: string;
 
-  @ApiPropertyOptional({ example: 'A', description: 'Filtrar por estado del contrato (A=activo, I=inactivo)' })
+  @ApiPropertyOptional({
+    enum: EstadoContrato,
+    example: EstadoContrato.ELABORADO,
+    description: 'Filtrar por estado del contrato',
+  })
   @IsOptional()
-  @IsString()
-  estado?: string;
+  @IsEnum(EstadoContrato)
+  estado?: EstadoContrato;
 }

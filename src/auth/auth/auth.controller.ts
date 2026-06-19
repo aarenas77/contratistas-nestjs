@@ -38,6 +38,18 @@ export class AuthController {
     return this.service.createUser(dto);
   }
 
+  @Get('usuarios/contratistas')
+  @Roles(Rol.ABOGADO)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Listar usuarios con rol CONTRATISTA',
+    description:
+      'Devuelve los usuarios activos con rol CONTRATISTA para usarlos en el formulario de creación de contratos.',
+  })
+  listarContratistas() {
+    return this.service.listarContratistas();
+  }
+
   @Post('dev-token')
   @Public()
   @HttpCode(200)

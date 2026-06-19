@@ -78,6 +78,25 @@ export class AuthService {
     }
   }
 
+  async listarContratistas() {
+    const contratistas = await this.prisma.usuario.findMany({
+      where: { rol: Rol.CONTRATISTA, activo: true },
+      orderBy: { nombre: 'asc' },
+      select: {
+        codigoTercero: true,
+        nombre: true,
+        userIdentification: true,
+        email: true,
+      },
+    });
+
+    return {
+      success: true,
+      data: contratistas,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   /**
    * Cambia la contraseña del usuario autenticado. Valida la contraseña actual,
    * baja el flag `mustChangePassword` y emite un token nuevo ya habilitado.

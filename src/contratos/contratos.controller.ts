@@ -31,7 +31,8 @@ export class ContratosController {
   @Roles(Rol.CONTRATISTA)
   @ApiOperation({
     summary: 'Listar contratos del contratista autenticado',
-    description: 'Retorna los contratos asociados al codigoTercero del usuario en sesión. Formato compatible con el legacy.',
+    description:
+      'Retorna los contratos asociados al codigoTercero del usuario en sesion. Formato compatible con el legacy.',
   })
   listar(@CurrentUser() user: JwtPayload, @Query() dto: ListarContratosDto) {
     return this.service.listar(user.codigoTercero, dto);
@@ -41,7 +42,8 @@ export class ContratosController {
   @Roles(Rol.ABOGADO)
   @ApiOperation({
     summary: 'Listar todos los contratos (rol ABOGADO o ADMINISTRADOR)',
-    description: 'Lista todos los contratos del sistema, con paginación y filtros opcionales por codigoTercero y estado.',
+    description:
+      'Lista todos los contratos del sistema, con paginacion y filtros opcionales por codigoTercero y estado.',
   })
   listarTodos(@Query() dto: ListarContratosAdminDto) {
     return this.service.listarTodos(dto);
@@ -51,7 +53,8 @@ export class ContratosController {
   @Roles(Rol.ABOGADO)
   @ApiOperation({
     summary: 'Listar contratistas para el formulario de contrato',
-    description: 'Devuelve los usuarios con rol CONTRATISTA activos (codigoTercero, nombre, identificación) para el desplegable.',
+    description:
+      'Devuelve los usuarios con rol CONTRATISTA activos (codigoTercero, nombre, identificacion) para el desplegable.',
   })
   listarContratistas() {
     return this.service.listarContratistas();
@@ -61,7 +64,8 @@ export class ContratosController {
   @Roles(Rol.ABOGADO)
   @ApiOperation({
     summary: 'Listar tipos de plazo disponibles',
-    description: 'Devuelve las opciones del desplegable Tipo de Plazo: D=Días, M=Meses, A=Años.',
+    description:
+      'Devuelve las opciones del desplegable Tipo de Plazo: D=Dias, M=Meses, A=Anos.',
   })
   tiposPlazo() {
     return this.service.tiposPlazo();
@@ -72,7 +76,7 @@ export class ContratosController {
   @ApiOperation({
     summary: 'Consultar el supervisor asociado a un contrato',
     description:
-      'Recibe el codigoContrato por query param y devuelve el nombre del supervisor y su código tercero.',
+      'Recibe el codigoContrato por query param y devuelve el nombre del supervisor y su codigo tercero.',
   })
   obtenerSupervisor(@Query() dto: ObtenerSupervisorDto) {
     return this.service.obtenerSupervisor(dto.codigoContrato);
@@ -82,7 +86,8 @@ export class ContratosController {
   @Roles(Rol.ABOGADO)
   @ApiOperation({
     summary: 'Crear un contrato (rol ABOGADO o ADMINISTRADOR)',
-    description: 'Crea un contrato. El codigoContrato se autogenera y el contrato queda en estado activo.',
+    description:
+      'Crea un contrato. El codigoContrato se autogenera y el contrato queda en estado ELABORADO.',
   })
   crear(@Body() dto: CreateContratoDto) {
     return this.service.crear(dto);
@@ -103,8 +108,8 @@ export class ContratosController {
   @Delete(':codigoContrato')
   @Roles(Rol.ABOGADO)
   @ApiOperation({
-    summary: 'Eliminar (inactivar) un contrato (rol ABOGADO o ADMINISTRADOR)',
-    description: 'Borrado lógico: cambia el estado del contrato a inactivo (I).',
+    summary: 'Inhabilitar un contrato (rol ABOGADO o ADMINISTRADOR)',
+    description: 'Cambia el estado del contrato a INHABILITADO.',
   })
   eliminar(@Param('codigoContrato', ParseIntPipe) codigoContrato: number) {
     return this.service.eliminar(codigoContrato);
@@ -114,7 +119,8 @@ export class ContratosController {
   @Roles(Rol.ABOGADO)
   @ApiOperation({
     summary: 'Clonar un contrato (rol ABOGADO o ADMINISTRADOR)',
-    description: 'Crea una copia del encabezado del contrato con un nuevo codigoContrato. No copia las cuentas de cobro.',
+    description:
+      'Crea una copia del encabezado del contrato con un nuevo codigoContrato. No copia las cuentas de cobro.',
   })
   clonar(@Param('codigoContrato', ParseIntPipe) codigoContrato: number) {
     return this.service.clonar(codigoContrato);
