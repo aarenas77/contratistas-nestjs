@@ -8,10 +8,12 @@ import { PdfTextExtractor } from './extraccion/pdf-text-extractor';
 import { RutPdfParser } from './extraccion/rut-pdf.parser';
 import { CertificadoBancarioParser } from './extraccion/certificado-bancario.parser';
 import { PresupuestoModule } from '../presupuesto/presupuesto.module';
+import { PagoSimpleModule } from '../pago-simple/pago-simple.module';
 
 @Module({
   imports: [
     PresupuestoModule,
+    PagoSimpleModule,
     MulterModule.register({
       storage: memoryStorage(),
       limits: { fileSize: 10 * 1024 * 1024 },

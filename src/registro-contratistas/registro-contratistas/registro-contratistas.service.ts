@@ -14,6 +14,11 @@ import { RutExtraidoDto } from '../dto/rut-extraido.dto';
 import { Rol } from '../../auth/interfaces/jwt-payload.interface';
 import { PRESUPUESTO_GATEWAY } from '../../presupuesto/presupuesto.gateway';
 import type { PresupuestoGateway } from '../../presupuesto/presupuesto.gateway';
+import { PAGO_SIMPLE_GATEWAY } from '../../pago-simple/pago-simple.gateway';
+import type {
+  PagoSimpleGateway,
+  SeguridadSocialSnapshot,
+} from '../../pago-simple/pago-simple.gateway';
 
 @Injectable()
 export class RegistroContratistasService {
@@ -22,7 +27,20 @@ export class RegistroContratistasService {
     private readonly extraccion: ExtraccionService,
     @Inject(PRESUPUESTO_GATEWAY)
     private readonly presupuesto: PresupuestoGateway,
+    @Inject(PAGO_SIMPLE_GATEWAY)
+    private readonly pagoSimple: PagoSimpleGateway,
   ) {}
+
+  /**
+   * Consulta aislada de seguridad social en PagoSimple. Devuelve `null` si no
+   * hay datos o si el proveedor falla.
+   */
+  consultarSeguridadSocial(
+    tipoDocumento: string,
+    documento: string,
+  ): Promise<SeguridadSocialSnapshot | null> {
+    return this.pagoSimple.consultarSeguridadSocial(tipoDocumento, documento);
+  }
 
   /** Paso 1: extrae la información del RUT y la certificación bancaria. */
   extraer(
@@ -67,6 +85,7 @@ export class RegistroContratistasService {
     const username = await this.generarUsername(rut);
     const password = this.generarPassword();
     const passwordHash = await bcrypt.hash(password, 10);
+    const seguridadSocial = await this.resolverSeguridadSocial(dto);
 
     let usuario;
     try {
@@ -82,6 +101,7 @@ export class RegistroContratistasService {
           // La contraseña generada es temporal: el contratista debe cambiarla
           // en su primer inicio de sesión.
           mustChangePassword: true,
+          ...seguridadSocial,
         },
       });
     } catch {
@@ -100,6 +120,51 @@ export class RegistroContratistasService {
         rol: usuario.rol,
       },
     };
+  }
+
+  /**
+   * Aplica las reglas de seguridad social: el valor manual del frontend tiene
+   * prioridad; lo que falte (EPS o AFP) se completa desde PagoSimple, de donde
+   * también se prefieren las fechas y el régimen. Si PagoSimple falla, se
+   * persiste lo disponible sin romper el registro.
+   */
+  private async resolverSeguridadSocial(dto: FinalizarRegistroDto) {
+    const manualEps = dto.eps?.trim() || null;
+    const manualAfp = dto.afp?.trim() || null;
+
+    // Solo se consulta el proveedor si falta EPS o AFP.
+    if (manualEps && manualAfp) {
+      return {
+        eps: manualEps,
+        afp: manualAfp,
+        origenSeguridadSocial: 'MANUAL',
+      };
+    }
+
+    const snapshot = await this.consultarSeguridadSocial(
+      this.mapearTipoDocumento(dto.rut.tipoDocumento),
+      dto.rut.numeroIdentificacion,
+    );
+
+    return {
+      eps: manualEps ?? snapshot?.eps ?? null,
+      epsFechaAfiliacion: snapshot?.epsFechaAfiliacion ?? null,
+      afp: manualAfp ?? snapshot?.afp ?? null,
+      afpFechaAfiliacion: snapshot?.afpFechaAfiliacion ?? null,
+      tipoAfiliado: snapshot?.tipoAfiliado ?? null,
+      origenSeguridadSocial:
+        manualEps || manualAfp ? 'MANUAL' : snapshot ? 'PAGOSIMPLE' : null,
+      seguridadSocialConsultadaAt: new Date(),
+    };
+  }
+
+  /** Traduce el tipo de documento del RUT (texto) al código que usa PagoSimple. */
+  private mapearTipoDocumento(tipoDocumento?: string | null): string {
+    const t = (tipoDocumento ?? '').toLowerCase();
+    if (t.includes('nit')) return 'NIT';
+    if (t.includes('extranjer')) return 'CE';
+    if (t.includes('pasaporte')) return 'PA';
+    return 'CC';
   }
 
   /** Nombre legible: persona natural usa nombres+apellidos; jurídica, la razón social. */

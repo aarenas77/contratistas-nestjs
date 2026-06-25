@@ -13,6 +13,8 @@ import { AprobadorModule } from './aprobador/aprobador.module';
 import { ContratosModule } from './contratos/contratos.module';
 import { RegistroContratistasModule } from './registro-contratistas/registro-contratistas.module';
 import { PresupuestoModule } from './presupuesto/presupuesto.module';
+import { PagoSimpleModule } from './pago-simple/pago-simple.module';
+import { AvatarsModule } from './avatars/avatars.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -30,6 +32,8 @@ import { PrismaModule } from './prisma/prisma.module';
     ContratosModule,
     RegistroContratistasModule,
     PresupuestoModule,
+    PagoSimpleModule,
+    AvatarsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

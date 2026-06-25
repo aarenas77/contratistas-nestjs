@@ -100,6 +100,16 @@ model Usuario {
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
+  // Snapshot de seguridad social (PagoSimple BDUA/RUAF). Todo opcional: puede
+  // completarse manualmente desde el front o automáticamente al registrar.
+  eps                          String?   @map("eps")
+  epsFechaAfiliacion           DateTime? @map("eps_fecha_afiliacion") @db.Date
+  afp                          String?   @map("afp")
+  afpFechaAfiliacion           DateTime? @map("afp_fecha_afiliacion") @db.Date
+  tipoAfiliado                 String?   @map("tipo_afiliado")
+  origenSeguridadSocial        String?   @map("origen_seguridad_social")
+  seguridadSocialConsultadaAt  DateTime? @map("seguridad_social_consultada_at")
+
   @@map("usuarios")
 }
 

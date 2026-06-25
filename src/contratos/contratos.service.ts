@@ -82,8 +82,12 @@ export class ContratosService {
         fechaElaboracion: new Date(dto.fechaElaboracion),
         fechaRegistro: new Date(),
         fechaFin: dto.fechaFin ? new Date(dto.fechaFin) : null,
-        fechaAprobacion: dto.fechaAprobacion ? new Date(dto.fechaAprobacion) : null,
-        fechaInicioSecop: dto.fechaInicioSecop ? new Date(dto.fechaInicioSecop) : null,
+        fechaAprobacion: dto.fechaAprobacion
+          ? new Date(dto.fechaAprobacion)
+          : null,
+        fechaInicioSecop: dto.fechaInicioSecop
+          ? new Date(dto.fechaInicioSecop)
+          : null,
         plazoDias: dto.plazoDias,
         tipoPlazo: dto.tipoPlazo,
         consecutivoCompromiso: dto.consecutivoCompromiso,
@@ -118,9 +122,13 @@ export class ContratosService {
     if (dto.fechaFin !== undefined)
       data.fechaFin = dto.fechaFin ? new Date(dto.fechaFin) : null;
     if (dto.fechaAprobacion !== undefined)
-      data.fechaAprobacion = dto.fechaAprobacion ? new Date(dto.fechaAprobacion) : null;
+      data.fechaAprobacion = dto.fechaAprobacion
+        ? new Date(dto.fechaAprobacion)
+        : null;
     if (dto.fechaInicioSecop !== undefined)
-      data.fechaInicioSecop = dto.fechaInicioSecop ? new Date(dto.fechaInicioSecop) : null;
+      data.fechaInicioSecop = dto.fechaInicioSecop
+        ? new Date(dto.fechaInicioSecop)
+        : null;
 
     const contrato = await this.prisma.contrato.update({
       where: { codigoContrato },

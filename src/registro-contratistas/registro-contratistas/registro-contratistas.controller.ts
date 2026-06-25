@@ -2,8 +2,10 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   HttpCode,
   Post,
+  Query,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
@@ -13,6 +15,7 @@ import { RegistroContratistasService } from './registro-contratistas.service';
 import { Public } from '../../auth/decorators/public.decorator';
 import { DatosExtraidosDto } from '../dto/datos-extraidos.dto';
 import { FinalizarRegistroDto } from '../dto/finalizar-registro.dto';
+import { ConsultarSeguridadSocialDto } from '../dto/consultar-seguridad-social.dto';
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
@@ -67,6 +70,21 @@ export class RegistroContratistasController {
       'certificadoBancario',
     );
     return this.service.extraer(rut, certificado);
+  }
+
+  @Get('seguridad-social')
+  @Public()
+  @ApiOperation({
+    summary: 'Consulta EPS/AFP en PagoSimple (BDUA/RUAF) por documento',
+    description:
+      'Consulta aislada para que el frontend precargue seguridad social. ' +
+      'Devuelve null si no hay datos o si el proveedor no responde.',
+  })
+  consultarSeguridadSocial(@Query() query: ConsultarSeguridadSocialDto) {
+    return this.service.consultarSeguridadSocial(
+      query.tipoDocumento,
+      query.documento,
+    );
   }
 
   @Post('finalizar')
